@@ -5,33 +5,62 @@ import { SettingsView } from '../../components/SettingsView';
 import { HistoryView } from '../../components/HistoryView';
 import { ThemeProvider } from '../../components/ThemeProvider';
 import { GoalInput } from '../../components/GoalInput';
-import '../../index.css';
+import { GoalCard } from '../../components/GoalCard';
 import { storage } from '../../utils/storage';
+import { type Goal } from '../../types/goals';
+import '../../index.css';
 
 const NewTab: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [goals, setGoals] = useState<Goal[]>([]);
 
-  // Run this once to clean up old data
   useEffect(() => {
-    const cleanup = async () => {
-      await storage.cleanStorage();
-      // or use storage.cleanTasks() if you want to keep some other settings
+    const loadGoals = async () => {
+      const savedGoals = await storage.getGoals();
+      setGoals(savedGoals);
     };
-    cleanup();
+    loadGoals();
   }, []);
+
+  const handleAddGoal = async (goal: Goal) => {
+    const updatedGoals = [...goals, goal];
+    setGoals(updatedGoals);
+    await storage.saveGoals(updatedGoals);
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    const updatedGoals = goals.filter(goal => goal.id !== goalId);
+    setGoals(updatedGoals);
+    await storage.saveGoals(updatedGoals);
+  };
 
   return (
     <>
       <div className="min-h-screen bg-background p-8">
-        <div className="mx-auto max-w-2xl space-y-6">
-          <div className="text-center mb-12">
-            <h1 className="text-3xl font-bold">What's The Status</h1>
-            <p className="mt-2 text-muted-foreground">
-              Your daily companion
-            </p>
+        <div className="mx-auto max-w-3xl">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-pink-600">
+              What's The Status
+            </h1>
           </div>
-          <GoalInput />
+
+          {/* Main Content */}
+          <div className="space-y-6">
+            <GoalInput onGoalAdded={handleAddGoal} />
+            
+            {/* Goals List */}
+            <div className="space-y-4">
+              {goals.map((goal) => (
+                <GoalCard
+                  key={goal.id}
+                  goal={goal}
+                  onDelete={handleDeleteGoal}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
