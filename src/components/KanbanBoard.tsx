@@ -3,6 +3,8 @@ import { Task, TaskStatus } from '../types/tasks';
 import { KanbanColumn } from './KanbanColumn';
 import { DoneColumn } from './DoneColumn';
 import { FloatingAddButton } from './FloatingAddButton';
+import { FloatingSettingsButton } from './FloatingSettingsButton';
+import { SettingsModal } from './SettingsModal';
 
 const STATUS_ORDER: TaskStatus[] = ['NEW', 'UP_NEXT', 'WORKING', 'BLOCKED'];
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -54,6 +56,7 @@ const DEMO_TASKS: Task[] = [
 
 export function KanbanBoard() {
   const [tasks, setTasks] = useState<Task[]>(DEMO_TASKS);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const addTask = (status: TaskStatus) => {
     const title = prompt('Task title?');
@@ -97,6 +100,8 @@ export function KanbanBoard() {
 
   return (
     <div className="flex gap-4 overflow-x-auto p-4 min-h-[70vh]">
+      <FloatingSettingsButton onClick={() => setSettingsOpen(true)} />
+      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
       {STATUS_ORDER.map(status => (
         <KanbanColumn
           key={status}
