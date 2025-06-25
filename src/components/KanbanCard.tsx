@@ -31,14 +31,19 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
   };
 
   return (
-    <div className="bg-card rounded-lg border border-purple-700/40 p-4 flex items-center justify-between gap-2 shadow-sm">
-      <div className="flex-1 min-w-0">
-        <div className="font-medium truncate">{task.title}</div>
+    <div className="relative bg-card rounded-lg border border-border shadow-sm group overflow-hidden transition-transform hover:shadow-md hover:-translate-y-1 px-5 py-4 flex flex-col justify-between min-h-[110px]">
+      <div>
+        <div
+          className="font-medium text-base text-foreground leading-snug line-clamp-3 mb-1"
+          title={task.title}
+        >
+          {task.title}
+        </div>
         {task.status === 'WORKING' && (
-          <div className="text-xs text-purple-400 mt-1">{formatTime(elapsed)}</div>
+          <div className="text-xs text-muted-foreground font-mono mb-1">{formatTime(elapsed)}</div>
         )}
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
         {task.status === 'WORKING' && (
           <Button size="icon" variant="ghost" onClick={() => onToggleTimer(task.id)}>
             <Pause className="h-4 w-4" />

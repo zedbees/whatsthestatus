@@ -5,10 +5,11 @@ import { DoneColumn } from './DoneColumn';
 import { FloatingAddButton } from './FloatingAddButton';
 import { FloatingSettingsButton } from './FloatingSettingsButton';
 import { SettingsModal } from './SettingsModal';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-const STATUS_ORDER: TaskStatus[] = ['NEW', 'UP_NEXT', 'WORKING', 'BLOCKED'];
+const STATUS_ORDER: TaskStatus[] = ['UP_NEXT', 'WORKING', 'BLOCKED'];
 const STATUS_LABELS: Record<TaskStatus, string> = {
-  NEW: 'New Item',
+  NEW: 'Backlog',
   UP_NEXT: 'Up Next',
   WORKING: 'Currently Working',
   BLOCKED: 'Blocked',
@@ -57,6 +58,8 @@ const DEMO_TASKS: Task[] = [
 export function KanbanBoard() {
   const [tasks, setTasks] = useState<Task[]>(DEMO_TASKS);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showBacklog, setShowBacklog] = useState(false);
+  const [showDone, setShowDone] = useState(false);
 
   const addTask = (status: TaskStatus) => {
     const title = prompt('Task title?');
@@ -82,9 +85,10 @@ export function KanbanBoard() {
   const moveTask = (id: string, direction: 'left' | 'right') => {
     setTasks(tasks => tasks.map(t => {
       if (t.id !== id) return t;
-      const idx = STATUS_ORDER.indexOf(t.status as TaskStatus);
-      const newIdx = direction === 'left' ? Math.max(0, idx - 1) : Math.min(STATUS_ORDER.length - 1, idx + 1);
-      return { ...t, status: STATUS_ORDER[newIdx], updatedAt: new Date().toISOString() };
+      const allStatuses: TaskStatus[] = ['NEW', ...STATUS_ORDER, 'DONE'];
+      const idx = allStatuses.indexOf(t.status as TaskStatus);
+      const newIdx = direction === 'left' ? Math.max(0, idx - 1) : Math.min(allStatuses.length - 1, idx + 1);
+      return { ...t, status: allStatuses[newIdx], updatedAt: new Date().toISOString() };
     }));
   };
   const toggleTimer = (id: string) => {
@@ -99,29 +103,70 @@ export function KanbanBoard() {
   };
 
   return (
-    <div className="flex gap-4 overflow-x-auto p-4 min-h-[70vh]">
+    <div className="relative min-h-[80vh] bg-background">
       <FloatingSettingsButton onClick={() => setSettingsOpen(true)} />
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
-      {STATUS_ORDER.map(status => (
-        <KanbanColumn
-          key={status}
-          title={STATUS_LABELS[status]}
-          status={status}
-          tasks={tasks.filter(t => t.status === status)}
-          onAdd={addTask}
-          onDelete={deleteTask}
-          onEdit={editTask}
-          onMove={moveTask}
-          onToggleTimer={toggleTimer}
-        />
-      ))}
-      <DoneColumn
-        tasks={tasks.filter(t => t.status === 'DONE')}
-        onDelete={deleteTask}
-        onEdit={editTask}
-        onMove={moveTask}
-        onToggleTimer={toggleTimer}
-      />
+      {/* Sticky Backlog Button */}
+      <button
+        className="fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-card border border-border rounded-r-lg shadow px-3 py-3 flex items-center gap-2 hover:bg-muted transition-colors"
+        onClick={() => setShowBacklog(v => !v)}
+        aria-label="Show Backlog"
+      >
+        <ChevronLeft className={`h-6 w-6 transition-transform ${showBacklog ? 'rotate-180' : ''}`} />
+        <span className="text-xs font-medium text-muted-foreground select-none">Backlog</span>
+      </button>
+      {/* Sticky Done Button */}
+      <button
+        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-card border border-border rounded-l-lg shadow px-3 py-3 flex items-center gap-2 hover:bg-muted transition-colors"
+        onClick={() => setShowDone(v => !v)}
+        aria-label="Show Done"
+      >
+        <span className="text-xs font-medium text-muted-foreground select-none">Done</span>
+        <ChevronRight className={`h-6 w-6 transition-transform ${showDone ? 'rotate-180' : ''}`} />
+      </button>
+      {/* Slide-in Backlog */}
+      <div className={`fixed top-0 left-0 h-full z-30 transition-transform duration-300 ${showBacklog ? 'translate-x-0' : '-translate-x-full'}`} style={{width: 340}}>
+        <div className="h-full bg-background border-r border-border shadow-lg flex flex-col">
+          <KanbanColumn
+            title={STATUS_LABELS['NEW']}
+            status={'NEW'}
+            tasks={tasks.filter(t => t.status === 'NEW')}
+            onAdd={addTask}
+            onDelete={deleteTask}
+            onEdit={editTask}
+            onMove={moveTask}
+            onToggleTimer={toggleTimer}
+          />
+        </div>
+      </div>
+      {/* Slide-in Done */}
+      <div className={`fixed top-0 right-0 h-full z-30 transition-transform duration-300 ${showDone ? 'translate-x-0' : 'translate-x-full'}`} style={{width: 340}}>
+        <div className="h-full bg-background border-l border-border shadow-lg flex flex-col">
+          <DoneColumn
+            tasks={tasks.filter(t => t.status === 'DONE')}
+            onDelete={deleteTask}
+            onEdit={editTask}
+            onMove={moveTask}
+            onToggleTimer={toggleTimer}
+          />
+        </div>
+      </div>
+      {/* Main Columns */}
+      <div className="flex gap-8 overflow-x-auto p-8 min-h-[70vh] max-w-[1200px] mx-auto justify-center">
+        {STATUS_ORDER.map(status => (
+          <KanbanColumn
+            key={status}
+            title={STATUS_LABELS[status]}
+            status={status}
+            tasks={tasks.filter(t => t.status === status)}
+            onAdd={addTask}
+            onDelete={deleteTask}
+            onEdit={editTask}
+            onMove={moveTask}
+            onToggleTimer={toggleTimer}
+          />
+        ))}
+      </div>
       <FloatingAddButton onClick={() => addTask('NEW')} />
     </div>
   );
