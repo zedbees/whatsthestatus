@@ -104,6 +104,8 @@ export function KanbanBoard() {
 
   return (
     <div className="relative min-h-[80vh] bg-background">
+      {/* Subtle dark gradient background */}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-[#18181b] via-[#232336] to-[#18181b] opacity-90" />
       <FloatingSettingsButton onClick={() => setSettingsOpen(true)} />
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
       {/* Sticky Backlog Button */}
@@ -152,7 +154,7 @@ export function KanbanBoard() {
         </div>
       </div>
       {/* Main Columns */}
-      <div className="flex gap-8 overflow-x-auto p-8 min-h-[70vh] max-w-[1200px] mx-auto justify-center">
+      <div className="flex gap-8 overflow-x-auto p-4 sm:p-6 md:p-8 w-full">
         {STATUS_ORDER.map(status => (
           <KanbanColumn
             key={status}

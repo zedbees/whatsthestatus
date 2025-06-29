@@ -11,6 +11,13 @@ interface KanbanCardProps {
   onToggleTimer: (id: string) => void;
 }
 
+function statusBgColor(status: string) {
+  if (status === 'UP_NEXT') return 'bg-blue-900/20';
+  if (status === 'WORKING') return 'bg-green-900/20';
+  if (status === 'BLOCKED') return 'bg-red-900/20';
+  return 'bg-card';
+}
+
 export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: KanbanCardProps) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -31,7 +38,7 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
   };
 
   return (
-    <div className="relative bg-card rounded-lg border border-border shadow-sm group overflow-hidden transition-transform hover:shadow-md hover:-translate-y-1 px-5 py-4 flex flex-col justify-between min-h-[110px]">
+    <div className={`relative ${statusBgColor(task.status)} rounded-md shadow-sm group overflow-hidden transition-transform hover:shadow-lg hover:-translate-y-1 px-5 py-6 flex flex-col justify-between min-h-[110px]`}>
       <div>
         <div
           className="font-medium text-base text-foreground leading-snug line-clamp-3 mb-1"
@@ -40,7 +47,7 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
           {task.title}
         </div>
         {task.status === 'WORKING' && (
-          <div className="text-xs text-muted-foreground font-mono mb-1">{formatTime(elapsed)}</div>
+          <div className="text-xs text-muted-foreground/80 font-mono mb-1">{formatTime(elapsed)}</div>
         )}
       </div>
       <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">

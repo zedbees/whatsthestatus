@@ -15,14 +15,14 @@ interface KanbanColumnProps {
 
 export function KanbanColumn({ title, status, tasks, onAdd, onDelete, onEdit, onMove, onToggleTimer }: KanbanColumnProps) {
   return (
-    <div className="flex flex-col bg-card rounded-xl border border-border shadow-md min-w-[270px] max-w-xs px-3 py-4">
-      <div className="flex items-center justify-between mb-4">
-        <span className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">{title}</span>
+    <div className="flex flex-col bg-card rounded-md shadow-md min-w-[270px] max-w-xs px-4 py-6">
+      <div className="flex items-center justify-between mb-6">
+        <span className="font-bold text-base uppercase tracking-wide text-muted-foreground">{title}</span>
         <Button size="icon" variant="outline" className="border-muted" onClick={() => onAdd(status)}>
           +
         </Button>
       </div>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-5">
         {tasks.map(task => (
           <KanbanCard
             key={task.id}
