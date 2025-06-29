@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { settingsStore, Settings } from '../stores/settings';
-
-type Theme = Settings['theme'];
+import { settingsStore } from '../stores/settings';
+import type { Theme } from '../themes';
+import { themes } from '../themes';
 
 interface ThemeProviderProps {
   children: React.ReactNode;
@@ -9,38 +9,41 @@ interface ThemeProviderProps {
 
 interface ThemeContextType {
   theme: Theme;
-  setTheme: (theme: Theme) => void;
+  setThemeById: (id: string) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>('system');
+  const [theme, setTheme] = useState<Theme>(themes[0]);
 
   useEffect(() => {
     const loadTheme = async () => {
       const settings = await settingsStore.getSettings();
-      setTheme(settings.theme);
+      const themeId = typeof settings.themeId === 'string' ? settings.themeId : undefined;
+      const found = themeId
+        ? themes.find((t: Theme) => t.id === themeId)
+        : undefined;
+      setTheme(found || themes[0]);
     };
     loadTheme();
   }, []);
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
-      root.classList.add(systemTheme);
-    } else {
-      root.classList.add(theme);
-    }
+    Object.entries(theme.colors).forEach(([key, value]) => {
+      root.style.setProperty(`--${key}`, value);
+    });
+    settingsStore.updateSettings({ themeId: theme.id });
   }, [theme]);
 
+  const setThemeById = (id: string) => {
+    const found = themes.find((t: Theme) => t.id === id);
+    if (found) setTheme(found);
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setThemeById }}>
       {children}
     </ThemeContext.Provider>
   );

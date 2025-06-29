@@ -4,6 +4,7 @@ export interface Settings {
   autoPauseAfterMinutes: number;
   showCompletedTasks: boolean;
   theme: 'light' | 'dark' | 'system';
+  themeId?: string; // new property for theme system
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -11,7 +12,8 @@ const DEFAULT_SETTINGS: Settings = {
   endOfDayTime: 16,
   autoPauseAfterMinutes: 30,
   showCompletedTasks: true,
-  theme: 'system'
+  theme: 'system',
+  themeId: undefined,
 };
 
 export const settingsStore = {

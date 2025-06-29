@@ -12,9 +12,9 @@ interface KanbanCardProps {
 }
 
 function statusBgColor(status: string) {
-  if (status === 'UP_NEXT') return 'bg-blue-900/20';
-  if (status === 'WORKING') return 'bg-green-900/20';
-  if (status === 'BLOCKED') return 'bg-red-900/20';
+  if (status === 'UP_NEXT') return 'bg-primary/20';
+  if (status === 'WORKING') return 'bg-accent/20';
+  if (status === 'BLOCKED') return 'bg-destructive/20';
   return 'bg-card';
 }
 

@@ -121,7 +121,7 @@ export function KanbanBoard() {
   return (
     <div className="relative min-h-[80vh] bg-background">
       {/* Subtle dark gradient background */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-[#18181b] via-[#232336] to-[#18181b] opacity-90" />
+      <div className="absolute inset-0 -z-10" style={{ background: 'var(--background)' }} />
       <FloatingSettingsButton onClick={() => setSettingsOpen(true)} />
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
       {/* Sticky Backlog Button */}

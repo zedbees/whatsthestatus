@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
-import { Sun, Moon, Laptop } from 'lucide-react';
-import { useTheme } from './ThemeProvider';
+import { useState } from 'react';
+import { ThemeSwitcherModal } from './ThemeSwitcherModal';
 
 interface SettingsModalProps {
   open: boolean;
@@ -9,7 +9,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
-  const { theme, setTheme } = useTheme();
+  const [themeModalOpen, setThemeModalOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -20,32 +20,15 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         <div className="space-y-6 mt-4">
           <div>
             <div className="font-semibold mb-2">Theme</div>
-            <div className="flex gap-2">
-              <Button
-                variant={theme === 'light' ? 'default' : 'outline'}
-                onClick={() => setTheme('light')}
-                size="icon"
-                aria-label="Light Theme"
-              >
-                <Sun />
-              </Button>
-              <Button
-                variant={theme === 'dark' ? 'default' : 'outline'}
-                onClick={() => setTheme('dark')}
-                size="icon"
-                aria-label="Dark Theme"
-              >
-                <Moon />
-              </Button>
-              <Button
-                variant={theme === 'system' ? 'default' : 'outline'}
-                onClick={() => setTheme('system')}
-                size="icon"
-                aria-label="System Theme"
-              >
-                <Laptop />
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              onClick={() => setThemeModalOpen(true)}
+              className="w-full"
+              aria-label="Change Theme"
+            >
+              Change Theme
+            </Button>
+            <ThemeSwitcherModal open={themeModalOpen} onClose={() => setThemeModalOpen(false)} />
           </div>
           <div>
             <div className="font-semibold mb-2">Connect Platforms</div>

@@ -1,15 +1,20 @@
 import { Button } from './ui/button';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
+import { themes } from '../themes';
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setThemeById } = useTheme();
+
+  // Find the first light and dark theme ids
+  const lightTheme = themes.find(t => !t.isDark);
+  const darkTheme = themes.find(t => t.isDark);
 
   const toggleTheme = () => {
-    if (theme === 'dark') {
-      setTheme('light');
-    } else {
-      setTheme('dark');
+    if (theme.isDark && lightTheme) {
+      setThemeById(lightTheme.id);
+    } else if (!theme.isDark && darkTheme) {
+      setThemeById(darkTheme.id);
     }
   };
 
