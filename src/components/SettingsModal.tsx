@@ -1,7 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { Button } from './ui/button';
-import { useState } from 'react';
-import { ThemeSwitcherModal } from './ThemeSwitcherModal';
+import { useEffect } from 'react';
 
 interface SettingsModalProps {
   open: boolean;
@@ -9,7 +7,22 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
-  const [themeModalOpen, setThemeModalOpen] = useState(false);
+  useEffect(() => {
+    const stored = localStorage.getItem('theme') || 'system';
+    applyTheme(stored);
+  }, [open]);
+
+  function applyTheme(mode: string) {
+    if (mode === 'light') {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    } else if (mode === 'dark') {
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('light', 'dark');
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -18,18 +31,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
         <div className="space-y-6 mt-4">
-          <div>
-            <div className="font-semibold mb-2">Theme</div>
-            <Button
-              variant="outline"
-              onClick={() => setThemeModalOpen(true)}
-              className="w-full"
-              aria-label="Change Theme"
-            >
-              Change Theme
-            </Button>
-            <ThemeSwitcherModal open={themeModalOpen} onClose={() => setThemeModalOpen(false)} />
-          </div>
           <div>
             <div className="font-semibold mb-2">Connect Platforms</div>
             <div className="text-muted-foreground text-sm">Coming soon: Integrate with your favorite productivity tools.</div>

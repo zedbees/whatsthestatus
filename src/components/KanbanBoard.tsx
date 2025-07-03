@@ -6,6 +6,7 @@ import { FloatingAddButton } from './FloatingAddButton';
 import { FloatingSettingsButton } from './FloatingSettingsButton';
 import { SettingsModal } from './SettingsModal';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ThemeToggleFloatingButton } from './ThemeToggleFloatingButton';
 
 const STATUS_ORDER: TaskStatus[] = ['UP_NEXT', 'BLOCKED'];
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -122,6 +123,7 @@ export function KanbanBoard() {
     <div className="relative min-h-[80vh] bg-background">
       {/* Subtle dark gradient background */}
       <div className="absolute inset-0 -z-10" style={{ background: 'var(--background)' }} />
+      <ThemeToggleFloatingButton />
       <FloatingSettingsButton onClick={() => setSettingsOpen(true)} />
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
       {/* Sticky Backlog Button */}
