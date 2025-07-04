@@ -1,4 +1,4 @@
-export type TaskStatus = 'NEW' | 'UP_NEXT' | 'WORKING' | 'BLOCKED' | 'DONE';
+export type TaskStatus = 'NEW' | 'UP_NEXT' | 'WORKING' | 'IN_PROGRESS' | 'BLOCKED' | 'DONE';
 
 export interface Task {
   id: string;

@@ -8,11 +8,12 @@ import { SettingsModal } from './SettingsModal';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ThemeToggleFloatingButton } from './ThemeToggleFloatingButton';
 
-const STATUS_ORDER: TaskStatus[] = ['UP_NEXT', 'BLOCKED'];
+const STATUS_ORDER: TaskStatus[] = ['UP_NEXT', 'IN_PROGRESS', 'BLOCKED'];
 const STATUS_LABELS: Record<TaskStatus, string> = {
   NEW: 'Backlog',
   UP_NEXT: 'Up Next',
-  WORKING: 'Currently Working',
+  WORKING: 'Now Working',
+  IN_PROGRESS: 'In Progress',
   BLOCKED: 'Blocked',
   DONE: 'Done',
 };
@@ -105,11 +106,12 @@ export function KanbanBoard() {
             // Pause any other active task
             return { ...t, status: 'WORKING', startedAt: new Date().toISOString() };
           } else {
-            return { ...t, status: 'UP_NEXT', startedAt: undefined };
+            // Move to IN_PROGRESS when paused
+            return { ...t, status: 'IN_PROGRESS', startedAt: undefined };
           }
         } else if (currentActive && t.id === currentActive.id) {
           // Pause the previous active task
-          return { ...t, status: 'UP_NEXT', startedAt: undefined };
+          return { ...t, status: 'IN_PROGRESS', startedAt: undefined };
         }
         return t;
       });
@@ -210,6 +212,16 @@ export function KanbanBoard() {
           title={STATUS_LABELS['UP_NEXT']}
           status={'UP_NEXT'}
           tasks={tasks.filter(t => t.status === 'UP_NEXT')}
+          onAdd={addTask}
+          onDelete={deleteTask}
+          onEdit={editTask}
+          onMove={moveTask}
+          onToggleTimer={toggleTimer}
+        />
+        <KanbanColumn
+          title={STATUS_LABELS['IN_PROGRESS']}
+          status={'IN_PROGRESS'}
+          tasks={tasks.filter(t => t.status === 'IN_PROGRESS')}
           onAdd={addTask}
           onDelete={deleteTask}
           onEdit={editTask}
