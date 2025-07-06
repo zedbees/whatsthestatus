@@ -1,5 +1,11 @@
 export type TaskStatus = 'NEW' | 'UP_NEXT' | 'WORKING' | 'IN_PROGRESS' | 'BLOCKED' | 'DONE';
 
+export interface TaskHistoryEntry {
+  status: TaskStatus;
+  enteredAt: string; // ISO date string
+  exitedAt?: string; // ISO date string, undefined if still in this state
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -8,4 +14,5 @@ export interface Task {
   updatedAt: string;
   startedAt?: string; // for timer
   priority?: number;
+  history: TaskHistoryEntry[];
 } 

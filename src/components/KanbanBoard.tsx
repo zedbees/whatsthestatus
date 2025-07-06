@@ -25,6 +25,9 @@ const DEMO_TASKS: Task[] = [
     status: 'NEW',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    history: [
+      { status: 'NEW', enteredAt: new Date().toISOString() }
+    ]
   },
   {
     id: '2',
@@ -33,6 +36,11 @@ const DEMO_TASKS: Task[] = [
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     startedAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(), // 12 min ago
+    history: [
+      { status: 'NEW', enteredAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(), exitedAt: new Date(Date.now() - 1000 * 60 * 15).toISOString() },
+      { status: 'UP_NEXT', enteredAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(), exitedAt: new Date(Date.now() - 1000 * 60 * 12).toISOString() },
+      { status: 'WORKING', enteredAt: new Date(Date.now() - 1000 * 60 * 12).toISOString() }
+    ]
   },
   {
     id: '3',
@@ -40,6 +48,10 @@ const DEMO_TASKS: Task[] = [
     status: 'UP_NEXT',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    history: [
+      { status: 'NEW', enteredAt: new Date(Date.now() - 1000 * 60 * 10).toISOString(), exitedAt: new Date(Date.now() - 1000 * 60 * 5).toISOString() },
+      { status: 'UP_NEXT', enteredAt: new Date(Date.now() - 1000 * 60 * 5).toISOString() }
+    ]
   },
   {
     id: '4',
@@ -47,6 +59,11 @@ const DEMO_TASKS: Task[] = [
     status: 'BLOCKED',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    history: [
+      { status: 'NEW', enteredAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), exitedAt: new Date(Date.now() - 1000 * 60 * 20).toISOString() },
+      { status: 'UP_NEXT', enteredAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(), exitedAt: new Date(Date.now() - 1000 * 60 * 10).toISOString() },
+      { status: 'BLOCKED', enteredAt: new Date(Date.now() - 1000 * 60 * 10).toISOString() }
+    ]
   },
   {
     id: '5',
@@ -54,6 +71,12 @@ const DEMO_TASKS: Task[] = [
     status: 'DONE',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    history: [
+      { status: 'NEW', enteredAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(), exitedAt: new Date(Date.now() - 1000 * 60 * 40).toISOString() },
+      { status: 'UP_NEXT', enteredAt: new Date(Date.now() - 1000 * 60 * 40).toISOString(), exitedAt: new Date(Date.now() - 1000 * 60 * 20).toISOString() },
+      { status: 'WORKING', enteredAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(), exitedAt: new Date(Date.now() - 1000 * 60 * 10).toISOString() },
+      { status: 'DONE', enteredAt: new Date(Date.now() - 1000 * 60 * 10).toISOString() }
+    ]
   },
 ];
 
@@ -77,6 +100,9 @@ export function KanbanBoard() {
         status,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        history: [
+          { status, enteredAt: new Date().toISOString() }
+        ]
       },
     ]);
   };

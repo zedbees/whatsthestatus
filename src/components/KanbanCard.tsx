@@ -37,6 +37,47 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   };
 
+  // State display names and colors for pills
+  const stateDisplay: Record<string, { label: string; color: string }> = {
+    UP_NEXT: { label: 'Up Next', color: '#a5b4fc' },
+    WORKING: { label: 'Working', color: '#6ee7b7' },
+    IN_PROGRESS: { label: 'In Progress', color: '#fbbf24' },
+    BLOCKED: { label: 'Blocked', color: '#fca5a5' },
+    NEW: { label: 'Backlog', color: '#d1d5db' },
+    DONE: { label: 'Done', color: '#c7d2fe' },
+  };
+
+  // Human-readable duration formatter
+  function formatDuration(ms: number): string {
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s} second${s !== 1 ? 's' : ''}`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} minute${m !== 1 ? 's' : ''}`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} hour${h !== 1 ? 's' : ''}`;
+    const d = Math.floor(h / 24);
+    if (d < 7) return `${d} day${d !== 1 ? 's' : ''}`;
+    const w = Math.floor(d / 7);
+    if (w < 4) return `${w} week${w !== 1 ? 's' : ''}`;
+    const mo = Math.floor(d / 30);
+    return `${mo} month${mo !== 1 ? 's' : ''}`;
+  }
+
+  // Prepare pills from history
+  const now = Date.now();
+  const pills = task.history.map((entry, i) => {
+    const start = new Date(entry.enteredAt).getTime();
+    const end = entry.exitedAt ? new Date(entry.exitedAt).getTime() : now;
+    const durationMs = end - start;
+    return {
+      key: `${entry.status}-${i}`,
+      status: entry.status,
+      label: stateDisplay[entry.status]?.label || entry.status,
+      color: stateDisplay[entry.status]?.color || '#e5e7eb',
+      duration: formatDuration(durationMs),
+    };
+  });
+
   return (
     <div className={`relative ${statusBgColor(task.status)} rounded-md shadow-sm group overflow-hidden transition-transform hover:shadow-lg hover:-translate-y-1 px-5 py-6 flex flex-col justify-between min-h-[110px]`}>
       <div>
@@ -45,6 +86,19 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
           title={task.title}
         >
           {task.title}
+        </div>
+        {/* Pills row for state durations */}
+        <div className="flex flex-wrap gap-2 mt-2">
+          {pills.map(pill => (
+            <span
+              key={pill.key}
+              className="px-2 py-0.5 rounded-full text-xs font-semibold shadow-sm"
+              style={{ background: pill.color, color: '#222', minWidth: 70, textAlign: 'center' }}
+              title={`${pill.label}: ${pill.duration}`}
+            >
+              {pill.label} {pill.duration}
+            </span>
+          ))}
         </div>
         {task.status === 'WORKING' && (
           <div className="text-xs text-muted-foreground/80 font-mono mb-1">{formatTime(elapsed)}</div>
