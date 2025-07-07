@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Task, TaskStatus } from '../types/tasks';
 import { KanbanColumn } from './KanbanColumn';
 import { DoneColumn } from './DoneColumn';
 import { FloatingAddButton } from './FloatingAddButton';
 import { FloatingSettingsButton } from './FloatingSettingsButton';
 import { SettingsModal } from './SettingsModal';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { ThemeToggleFloatingButton } from './ThemeToggleFloatingButton';
+import { ChevronDown } from 'lucide-react';
 
 const STATUS_ORDER: TaskStatus[] = ['UP_NEXT', 'IN_PROGRESS', 'BLOCKED'];
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -85,9 +86,34 @@ export function KanbanBoard() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showBacklog, setShowBacklog] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClick);
+    } else {
+      document.removeEventListener('mousedown', handleClick);
+    }
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [dropdownOpen]);
 
   // Find the active task (WORKING)
   const activeTask = tasks.find(t => t.status === 'WORKING');
+
+  // Demo workspaces/boards
+  const [workspaces] = useState([
+    { id: 'default', name: 'Personal' },
+    { id: 'jira', name: 'Jira Board' },
+    { id: 'azure', name: 'Azure DevOps' },
+  ]);
+  const [currentWorkspace, setCurrentWorkspace] = useState(workspaces[0].id);
 
   const addTask = (status: TaskStatus) => {
     const title = prompt('Task title?');
@@ -149,6 +175,40 @@ export function KanbanBoard() {
 
   return (
     <div className="relative min-h-[80vh] bg-background">
+      {/* Workspace/Board Title Selector (Top Left) */}
+      <div className="absolute left-8 top-6 z-50 flex items-center select-none" ref={dropdownRef}>
+        <button
+          className="flex items-center gap-2 text-base font-semibold text-foreground/70 bg-transparent border-none outline-none px-0 py-0 transition hover:underline hover:bg-muted/30 rounded-lg cursor-pointer"
+          style={{ boxShadow: 'none' }}
+          onClick={() => setDropdownOpen(v => !v)}
+        >
+          {workspaces.find(ws => ws.id === currentWorkspace)?.name}
+          <ChevronDown className={`w-4 h-4 text-muted-foreground opacity-70 transition ${dropdownOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {dropdownOpen && (
+          <ol className="absolute left-0 top-full mt-2 bg-card shadow-lg rounded-lg py-2 min-w-[180px] border border-border animate-in fade-in z-50 list-none p-0">
+            {workspaces.map(ws => (
+              <li key={ws.id}>
+                <button
+                  className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-gray-100 ${currentWorkspace === ws.id ? 'bg-muted font-bold' : ''}`}
+                  onClick={() => { setCurrentWorkspace(ws.id); setDropdownOpen(false); }}
+                  type="button"
+                >
+                  {ws.name}
+                </button>
+              </li>
+            ))}
+            <li>
+              <button
+                className="w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-primary/10 text-primary flex items-center gap-2"
+                onClick={() => { setDropdownOpen(false); setSettingsOpen(true); }}
+              >
+                <Plus className="w-4 h-4" /> Add New Board
+              </button>
+            </li>
+          </ol>
+        )}
+      </div>
       {/* Subtle dark gradient background */}
       <div className="absolute inset-0 -z-10" style={{ background: 'var(--background)' }} />
       <ThemeToggleFloatingButton />

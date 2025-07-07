@@ -36,6 +36,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             <div className="text-muted-foreground text-sm">Coming soon: Integrate with your favorite productivity tools.</div>
           </div>
           <div>
+            <div className="font-semibold mb-2">Import Board</div>
+            <div className="text-muted-foreground text-sm">Import from Jira, Trello, Azure, and more. <span className='italic'>Coming soon</span>.</div>
+          </div>
+          <div>
             <div className="font-semibold mb-2">Account</div>
             <div className="text-muted-foreground text-sm">Sign in to sync your board across devices. (Coming soon)</div>
           </div>
