@@ -46,7 +46,7 @@
   }
  
   .dark {
-    --background: 240 6% 10%; /* modern deep gray */
+    --background: 240 6% 10%;
     --foreground: 0 0% 98%;
  
     --card: 0 0% 12%;
@@ -88,5 +88,40 @@
   body {
     @apply text-foreground;
     background: var(--background);
+  }
+}
+
+/* Custom theme overrides */
+@layer utilities {
+  .bg-background {
+    background: var(--background);
+  }
+  
+  .bg-card {
+    background: var(--card);
+  }
+  
+  .text-foreground {
+    color: var(--text);
+  }
+  
+  .text-muted {
+    color: var(--muted);
+  }
+  
+  .border-border {
+    border-color: var(--border);
+  }
+  
+  .bg-primary {
+    background: var(--primary);
+  }
+  
+  .bg-accent {
+    background: var(--accent);
+  }
+  
+  .bg-muted {
+    background: var(--muted);
   }
 } 

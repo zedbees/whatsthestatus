@@ -11,13 +11,6 @@ interface KanbanCardProps {
   onToggleTimer: (id: string) => void;
 }
 
-function statusBgColor(status: string) {
-  if (status === 'UP_NEXT') return 'bg-primary/20';
-  if (status === 'WORKING') return 'bg-accent/20';
-  if (status === 'BLOCKED') return 'bg-destructive/20';
-  return 'bg-card';
-}
-
 export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: KanbanCardProps) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -79,7 +72,9 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
   });
 
   return (
-    <div className={`relative ${statusBgColor(task.status)} rounded-md shadow-sm group overflow-hidden transition-transform hover:shadow-lg hover:-translate-y-1 px-5 py-6 flex flex-col justify-between min-h-[110px]`}>
+    <div className={`relative bg-card border border-border rounded-xl shadow-lg group overflow-hidden transition-transform hover:-translate-y-1 px-6 py-6 flex flex-col justify-between min-h-[110px]`}>
+      {/* Left accent bar */}
+      <div className="absolute left-0 top-0 h-full w-1 bg-primary rounded-l-xl" />
       <div>
         <div
           className="font-medium text-base text-foreground leading-snug line-clamp-3 mb-1"

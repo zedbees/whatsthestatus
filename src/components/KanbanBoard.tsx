@@ -190,7 +190,7 @@ export function KanbanBoard() {
             {workspaces.map(ws => (
               <li key={ws.id}>
                 <button
-                  className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-gray-100 ${currentWorkspace === ws.id ? 'bg-muted font-bold' : ''}`}
+                  className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${currentWorkspace === ws.id ? 'bg-muted font-bold' : ''}`}
                   onClick={() => { setCurrentWorkspace(ws.id); setDropdownOpen(false); }}
                   type="button"
                 >
@@ -216,21 +216,21 @@ export function KanbanBoard() {
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
       {/* Sticky Backlog Button */}
       <button
-        className="fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-card border border-border rounded-r-lg shadow px-3 py-3 flex items-center gap-2 hover:bg-muted transition-colors"
+        className="fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-card text-foreground border border-border rounded-r-lg shadow-lg px-3 py-3 flex items-center gap-2 hover:bg-muted transition-colors"
         onClick={() => setShowBacklog(v => !v)}
         aria-label="Show Backlog"
       >
         <ChevronLeft className={`h-6 w-6 transition-transform ${showBacklog ? 'rotate-180' : ''}`} />
-        <span className="text-xs font-medium text-muted-foreground select-none">Backlog</span>
+        <span className="text-xs font-medium select-none">Backlog</span>
         <span className="ml-2 bg-muted text-xs rounded-full px-2 py-0.5 font-semibold">{backlogCount}</span>
       </button>
       {/* Sticky Done Button */}
       <button
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-card border border-border rounded-l-lg shadow px-3 py-3 flex items-center gap-2 hover:bg-muted transition-colors"
+        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-card text-foreground border border-border rounded-l-lg shadow-lg px-3 py-3 flex items-center gap-2 hover:bg-muted transition-colors"
         onClick={() => setShowDone(v => !v)}
         aria-label="Show Done"
       >
-        <span className="text-xs font-medium text-muted-foreground select-none">Done</span>
+        <span className="text-xs font-medium select-none">Done</span>
         <span className="ml-2 bg-muted text-xs rounded-full px-2 py-0.5 font-semibold">{doneCount}</span>
         <ChevronRight className={`h-6 w-6 transition-transform ${showDone ? 'rotate-180' : ''}`} />
       </button>
@@ -273,7 +273,7 @@ export function KanbanBoard() {
                 {activeTask.startedAt ? formatElapsed(activeTask.startedAt) : '00:00:00'}
               </span>
               <button
-                className="ml-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+                className="ml-2 px-4 py-2 rounded-lg bg-background text-primary border border-border font-medium hover:bg-muted transition-colors"
                 onClick={() => toggleTimer(activeTask.id)}
               >
                 Pause

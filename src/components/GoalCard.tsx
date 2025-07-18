@@ -14,7 +14,7 @@ export function GoalCard({ goal, onDelete }: GoalCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const getStatusColor = (deadline: string | undefined) => {
-    if (!deadline) return 'bg-gray-200';
+    if (!deadline) return 'bg-muted';
     
     const today = new Date();
     const deadlineDate = deadline.startsWith('Q') 

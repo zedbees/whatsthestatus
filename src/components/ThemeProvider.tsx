@@ -15,7 +15,9 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(themes[0]);
+  // Default to the first dark theme instead of first theme
+  const defaultTheme = themes.find(t => t.isDark) || themes[0];
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
 
   useEffect(() => {
     const loadTheme = async () => {
@@ -24,16 +26,48 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       const found = themeId
         ? themes.find((t: Theme) => t.id === themeId)
         : undefined;
-      setTheme(found || themes[0]);
+      
+      // If no theme is saved, check system preference
+      if (!found) {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const systemTheme = themes.find(t => t.isDark === prefersDark);
+        setTheme(systemTheme || defaultTheme);
+      } else {
+        setTheme(found);
+      }
     };
     loadTheme();
-  }, []);
+  }, [defaultTheme]);
 
   useEffect(() => {
     const root = window.document.documentElement;
-    Object.entries(theme.colors).forEach(([key, value]) => {
+    
+    // Apply the dark class based on theme
+    if (theme.isDark) {
+      root.classList.add('dark');
+      root.classList.remove('light');
+    } else {
+      root.classList.remove('dark');
+      root.classList.add('light');
+    }
+
+    // Map custom theme colors to Tailwind CSS variables
+    const colorMappings = {
+      background: theme.colors.background,
+      card: theme.colors.card,
+      border: theme.colors.border,
+      primary: theme.colors.primary,
+      accent: theme.colors.accent,
+      text: theme.colors.text,
+      muted: theme.colors.muted,
+    };
+
+    // Apply custom colors as CSS custom properties
+    Object.entries(colorMappings).forEach(([key, value]) => {
       root.style.setProperty(`--${key}`, value);
     });
+
+    // Update settings
     settingsStore.updateSettings({ themeId: theme.id });
   }, [theme]);
 
