@@ -87,7 +87,16 @@ export function KanbanBoard() {
   const [showBacklog, setShowBacklog] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(Date.now());
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Update current time every second for live timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -106,6 +115,15 @@ export function KanbanBoard() {
 
   // Find the active task (WORKING)
   const activeTask = tasks.find(t => t.status === 'WORKING');
+
+  // Live timer function for "Now Working" section
+  const getLiveElapsed = (startedAt: string) => {
+    const elapsed = Math.floor((currentTime - new Date(startedAt).getTime()) / 1000);
+    const h = Math.floor(elapsed / 3600);
+    const m = Math.floor((elapsed % 3600) / 60);
+    const s = elapsed % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   // Demo workspaces/boards
   const [workspaces] = useState([
@@ -216,23 +234,27 @@ export function KanbanBoard() {
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
       {/* Sticky Backlog Button */}
       <button
-        className="fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-card text-foreground border border-border rounded-r-lg shadow-lg px-3 py-3 flex items-center gap-2 hover:bg-muted transition-colors"
+        className="fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-card text-foreground border border-border rounded-r-xl shadow-lg px-4 py-4 flex items-center gap-3 hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 group"
         onClick={() => setShowBacklog(v => !v)}
         aria-label="Show Backlog"
       >
-        <ChevronLeft className={`h-6 w-6 transition-transform ${showBacklog ? 'rotate-180' : ''}`} />
-        <span className="text-xs font-medium select-none">Backlog</span>
-        <span className="ml-2 bg-muted text-xs rounded-full px-2 py-0.5 font-semibold">{backlogCount}</span>
+        <ChevronLeft className={`h-5 w-5 transition-transform ${showBacklog ? 'rotate-180' : ''}`} />
+        <div className="flex flex-col items-start">
+          <span className="text-sm font-medium select-none">Backlog</span>
+          <span className="text-xs text-muted-foreground group-hover:text-white/80">{backlogCount} items</span>
+        </div>
       </button>
       {/* Sticky Done Button */}
       <button
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-card text-foreground border border-border rounded-l-lg shadow-lg px-3 py-3 flex items-center gap-2 hover:bg-muted transition-colors"
+        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-card text-foreground border border-border rounded-l-xl shadow-lg px-4 py-4 flex items-center gap-3 hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 group"
         onClick={() => setShowDone(v => !v)}
         aria-label="Show Done"
       >
-        <span className="text-xs font-medium select-none">Done</span>
-        <span className="ml-2 bg-muted text-xs rounded-full px-2 py-0.5 font-semibold">{doneCount}</span>
-        <ChevronRight className={`h-6 w-6 transition-transform ${showDone ? 'rotate-180' : ''}`} />
+        <div className="flex flex-col items-end">
+          <span className="text-sm font-medium select-none">Done</span>
+          <span className="text-xs text-muted-foreground group-hover:text-white/80">{doneCount} items</span>
+        </div>
+        <ChevronRight className={`h-5 w-5 transition-transform ${showDone ? 'rotate-180' : ''}`} />
       </button>
       {/* Slide-in Backlog */}
       <div className={`fixed top-0 left-0 h-full z-30 transition-transform duration-300 ${showBacklog ? 'translate-x-0' : '-translate-x-full'}`} style={{width: 340}}>
@@ -270,10 +292,10 @@ export function KanbanBoard() {
             {/* Timer and controls */}
             <div className="flex items-center gap-4">
               <span className="font-mono text-xl text-primary">
-                {activeTask.startedAt ? formatElapsed(activeTask.startedAt) : '00:00:00'}
+                {activeTask.startedAt ? getLiveElapsed(activeTask.startedAt) : '00:00:00'}
               </span>
               <button
-                className="ml-2 px-4 py-2 rounded-lg bg-background text-primary border border-border font-medium hover:bg-muted transition-colors"
+                className="ml-2 px-4 py-2 rounded-lg bg-primary text-white font-medium hover:bg-primary/90 transition-colors"
                 onClick={() => toggleTimer(activeTask.id)}
               >
                 Pause
@@ -328,13 +350,4 @@ export function KanbanBoard() {
       <FloatingAddButton onClick={() => addTask('NEW')} />
     </div>
   );
-}
-
-// Helper to format elapsed time from startedAt
-function formatElapsed(startedAt: string) {
-  const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 } 

@@ -10,8 +10,8 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          // Minimal, neutral for light theme, colored for dark theme
-          "bg-background text-primary border border-border shadow-sm hover:bg-muted hover:text-primary focus-visible:ring-2 dark:bg-primary dark:text-primary-foreground dark:border-none dark:shadow hover:dark:bg-primary/90",
+          // Modern minimal for light theme, colored for dark theme
+          "bg-primary text-white shadow-sm hover:bg-primary/90 focus-visible:ring-2 dark:bg-primary dark:text-white dark:shadow hover:dark:bg-primary/90",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:

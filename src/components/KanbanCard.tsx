@@ -72,12 +72,10 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
   });
 
   return (
-    <div className={`relative bg-card border border-border rounded-xl shadow-lg group overflow-hidden transition-transform hover:-translate-y-1 px-6 py-6 flex flex-col justify-between min-h-[110px]`}>
-      {/* Left accent bar */}
-      <div className="absolute left-0 top-0 h-full w-1 bg-primary rounded-l-xl" />
+    <div className={`relative bg-card border border-border rounded-xl shadow-sm group overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 px-6 py-5 flex flex-col justify-between min-h-[120px]`}>
       <div>
         <div
-          className="font-medium text-base text-foreground leading-snug line-clamp-3 mb-1"
+          className="font-semibold text-base text-foreground leading-snug line-clamp-3 mb-3"
           title={task.title}
         >
           {task.title}

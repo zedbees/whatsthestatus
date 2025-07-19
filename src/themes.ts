@@ -20,14 +20,14 @@ export const themes: Theme[] = [
     name: 'Purple Dawn',
     isDark: false,
     colors: {
-      background: 'linear-gradient(135deg, #f8f6ff 0%, #f3e7fa 100%)',
-      column: '#f3f4f6', // new: very light gray for columns
-      card: '#fff',
-      border: '#e0d7f3',
-      primary: '#232336',
-      accent: '#a259ff',
-      text: '#232336',
-      muted: '#bdbdbd',
+      background: 'linear-gradient(135deg, #f8f9fb 0%, #f1f5f9 100%)', // Light gray background
+      column: '#f3f4f6', // Slightly darker column background
+      card: '#ffffff', // Pure white cards
+      border: '#e5e7eb', // Subtle border color
+      primary: '#2563eb', // Blue accent for actions
+      accent: '#2563eb', // Blue accent for highlights
+      text: '#1f2937', // Dark text
+      muted: '#6b7280', // Muted text
     },
   },
   {
@@ -35,14 +35,14 @@ export const themes: Theme[] = [
     name: 'Minimal Dark',
     isDark: true,
     colors: {
-      background: 'linear-gradient(135deg, #18181b 0%, #23272a 100%)',
-      column: '#202127', // new: between background and card
-      card: '#232329',
-      border: '#34343a',
-      primary: '#fafafa',
-      accent: '#3f3f46',
-      text: '#fafafa',
-      muted: '#6b7280',
+      background: 'linear-gradient(135deg, #18181b 0%, #111113 100%)', // Deep dark background
+      column: '#232329', // Mid-dark column background
+      card: '#26272b', // Lighter card background for separation
+      border: '#34343a', // Visible border
+      primary: '#2563eb', // Blue accent for actions
+      accent: '#2563eb', // Blue accent for highlights
+      text: '#f9fafb', // Light text
+      muted: '#9ca3af', // Muted text
     },
   },
   {
@@ -50,14 +50,14 @@ export const themes: Theme[] = [
     name: 'Blue Sky',
     isDark: false,
     colors: {
-      background: 'linear-gradient(135deg, #e0f2fe 0%, #f5faff 100%)',
-      column: '#f3f4f6',
-      card: '#fff',
-      border: '#dbeafe',
-      primary: '#1e293b',
-      accent: '#2563eb',
-      text: '#1e293b',
-      muted: '#94a3b8',
+      background: 'linear-gradient(135deg, #f8f9fb 0%, #f1f5f9 100%)', // Light gray background
+      column: '#f3f4f6', // Slightly darker column background
+      card: '#ffffff', // Pure white cards
+      border: '#e5e7eb', // Subtle border color
+      primary: '#2563eb', // Blue accent for actions
+      accent: '#2563eb', // Blue accent for highlights
+      text: '#1f2937', // Dark text
+      muted: '#6b7280', // Muted text
     },
   },
   {
@@ -65,14 +65,14 @@ export const themes: Theme[] = [
     name: 'Minimal Black',
     isDark: true,
     colors: {
-      background: 'linear-gradient(135deg, #111113 0%, #18181b 100%)',
-      column: '#18191d', // new: between background and card
-      card: '#232329',
-      border: '#34343a',
-      primary: '#fafafa',
-      accent: '#27272a',
-      text: '#fafafa',
-      muted: '#6b7280',
+      background: 'linear-gradient(135deg, #18181b 0%, #111113 100%)', // Deep dark background
+      column: '#232329', // Mid-dark column background
+      card: '#26272b', // Lighter card background for separation
+      border: '#34343a', // Visible border
+      primary: '#2563eb', // Blue accent for actions
+      accent: '#2563eb', // Blue accent for highlights
+      text: '#f9fafb', // Light text
+      muted: '#9ca3af', // Muted text
     },
   },
 ]; 

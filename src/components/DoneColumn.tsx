@@ -14,13 +14,13 @@ interface DoneColumnProps {
 export function DoneColumn({ tasks, onDelete, onEdit, onMove, onToggleTimer }: DoneColumnProps) {
   const [collapsed, setCollapsed] = useState(true);
   return (
-    <div className="flex flex-col bg-column border border-border rounded-2xl shadow-md min-w-[270px] max-w-xs px-6 py-8">
+    <div className="flex flex-col bg-column border border-border rounded-2xl shadow-sm min-w-[280px] max-w-xs px-6 py-6">
       <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setCollapsed(!collapsed)}>
-        <span className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Done ({tasks.length})</span>
+        <span className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Done ({tasks.length})</span>
         {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
       </div>
       {!collapsed && (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           {tasks.map(task => (
             <KanbanCard
               key={task.id}

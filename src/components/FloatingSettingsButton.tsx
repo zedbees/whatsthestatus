@@ -1,5 +1,5 @@
-import { Button } from './ui/button';
 import { Settings } from 'lucide-react';
+import { Button } from './ui/button';
 
 interface FloatingSettingsButtonProps {
   onClick: () => void;
@@ -8,12 +8,13 @@ interface FloatingSettingsButtonProps {
 export function FloatingSettingsButton({ onClick }: FloatingSettingsButtonProps) {
   return (
     <Button
-      onClick={onClick}
-      className="fixed bottom-8 left-8 z-50 bg-background text-primary border border-border rounded-full shadow-lg w-12 h-12 flex items-center justify-center hover:bg-muted hover:text-primary transition-colors dark:bg-primary dark:text-primary-foreground dark:border-none dark:shadow hover:dark:bg-primary/90"
       size="icon"
-      aria-label="Open Settings"
+      variant="ghost"
+      onClick={onClick}
+      className="fixed top-4 right-16 z-50 w-10 h-10 bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-foreground hover:bg-background/90 transition-all duration-200 shadow-sm hover:shadow-md"
+      aria-label="Settings"
     >
-      <Settings className="h-6 w-6" />
+      <Settings className="h-4 w-4" />
     </Button>
   );
 } 
