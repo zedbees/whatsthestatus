@@ -25,7 +25,13 @@ export function KanbanColumn({ title, status, tasks, onAdd, onDelete, onEdit, on
         </Button>
       </div>
       <div className="flex flex-col gap-4">
-        {tasks.map(task => (
+        {tasks.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <div className="text-sm font-medium mb-1">No tasks yet</div>
+            <div className="text-xs opacity-70">Click + to add a task</div>
+          </div>
+        ) : (
+          tasks.map(task => (
           <KanbanCard
             key={task.id}
             task={task}
@@ -34,7 +40,8 @@ export function KanbanColumn({ title, status, tasks, onAdd, onDelete, onEdit, on
             onMove={onMove}
             onToggleTimer={onToggleTimer}
           />
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

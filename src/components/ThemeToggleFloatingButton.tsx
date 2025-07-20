@@ -28,7 +28,7 @@ export function ThemeToggleFloatingButton() {
         setThemeById(lightTheme.id);
       } else if (!isCurrentDark && darkTheme) {
         setThemeById(darkTheme.id);
-      }
+  }
     }
   };
 

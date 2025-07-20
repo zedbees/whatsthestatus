@@ -12,7 +12,8 @@ export interface Task {
   status: TaskStatus;
   createdAt: string;
   updatedAt: string;
-  startedAt?: string; // for timer
+  startedAt?: string; // for current session timer
+  totalWorkingTime?: number; // total accumulated working time in milliseconds
   priority?: number;
   history: TaskHistoryEntry[];
 } 

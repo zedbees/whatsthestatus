@@ -38,7 +38,7 @@ export const themes: Theme[] = [
       background: 'linear-gradient(135deg, #18181b 0%, #111113 100%)', // Deep dark background
       column: '#232329', // Mid-dark column background
       card: '#26272b', // Lighter card background for separation
-      border: '#34343a', // Visible border
+      border: '#1f1f23', // Very subtle border color
       primary: '#2563eb', // Blue accent for actions
       accent: '#2563eb', // Blue accent for highlights
       text: '#f9fafb', // Light text
@@ -68,7 +68,7 @@ export const themes: Theme[] = [
       background: 'linear-gradient(135deg, #18181b 0%, #111113 100%)', // Deep dark background
       column: '#232329', // Mid-dark column background
       card: '#26272b', // Lighter card background for separation
-      border: '#34343a', // Visible border
+      border: '#1f1f23', // Very subtle border color
       primary: '#2563eb', // Blue accent for actions
       accent: '#2563eb', // Blue accent for highlights
       text: '#f9fafb', // Light text
