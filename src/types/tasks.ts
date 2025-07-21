@@ -9,7 +9,9 @@ export interface TaskHistoryEntry {
 export interface Task {
   id: string;
   title: string;
+  description?: string; // Optional description for the task
   status: TaskStatus;
+  workspaceId: string; // which workspace/board this task belongs to
   createdAt: string;
   updatedAt: string;
   startedAt?: string; // for current session timer

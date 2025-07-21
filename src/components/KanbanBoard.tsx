@@ -29,7 +29,15 @@ const DEMO_TASKS: Task[] = [];
 export function KanbanBoard() {
   const [tasks, setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem('kanban-tasks');
-    return saved ? JSON.parse(saved) : DEMO_TASKS;
+    const loadedTasks = saved ? JSON.parse(saved) : DEMO_TASKS;
+    
+    // Migrate existing tasks that don't have workspaceId to the default workspace
+    return loadedTasks.map((task: Task) => {
+      if (!task.workspaceId) {
+        return { ...task, workspaceId: 'default' };
+      }
+      return task;
+    });
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addBoardModalOpen, setAddBoardModalOpen] = useState(false);
@@ -37,6 +45,7 @@ export function KanbanBoard() {
   const [addTaskModalOpen, setAddTaskModalOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskStatus, setNewTaskStatus] = useState<TaskStatus>('NEW');
+  const [newTaskDescription, setNewTaskDescription] = useState('');
   const [showBacklog, setShowBacklog] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -47,9 +56,13 @@ export function KanbanBoard() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
+      // Update last active timestamp
+      localStorage.setItem('kanban-last-active', Date.now().toString());
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -134,11 +147,7 @@ export function KanbanBoard() {
   };
 
   // Filter tasks by current workspace
-  const currentWorkspaceTasks = tasks.filter(() => {
-    // For now, show all tasks since we don't have workspace filtering implemented yet
-    // TODO: Implement proper workspace filtering when workspaceId is added to Task interface
-    return true;
-  });
+  const currentWorkspaceTasks = tasks.filter(task => task.workspaceId === currentWorkspace);
 
   const handleCreateTask = () => {
     if (!newTaskTitle.trim()) return;
@@ -146,7 +155,9 @@ export function KanbanBoard() {
     const newTask: Task = {
       id: crypto.randomUUID(),
       title: newTaskTitle.trim(),
+      description: newTaskDescription.trim() || undefined,
       status: newTaskStatus,
+      workspaceId: currentWorkspace,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       history: [
@@ -156,11 +167,13 @@ export function KanbanBoard() {
     
     setTasks([...tasks, newTask]);
     setNewTaskTitle('');
+    setNewTaskDescription('');
     setAddTaskModalOpen(false);
   };
 
   const handleCancelCreateTask = () => {
     setNewTaskTitle('');
+    setNewTaskDescription('');
     setAddTaskModalOpen(false);
   };
 
@@ -304,11 +317,110 @@ export function KanbanBoard() {
     });
   };
 
+  // Function to move task directly to DONE status
+  const markTaskDone = (id: string) => {
+    setTasks(tasks => tasks.map(t => {
+      if (t.id !== id) return t;
+      const now = new Date().toISOString();
+      
+      // Calculate accumulated working time for this session if currently working
+      const sessionTime = t.status === 'WORKING' && t.startedAt ? Date.now() - new Date(t.startedAt).getTime() : 0;
+      const totalWorkingTime = (t.totalWorkingTime || 0) + sessionTime;
+      
+      // Update history
+      const newHistory = [...t.history];
+      // Close the current status entry if it exists
+      if (newHistory.length > 0 && !newHistory[newHistory.length - 1].exitedAt) {
+        newHistory[newHistory.length - 1].exitedAt = now;
+      }
+      // Add DONE status entry
+      newHistory.push({ status: 'DONE', enteredAt: now });
+      
+      return { 
+        ...t, 
+        status: 'DONE', 
+        updatedAt: now,
+        totalWorkingTime,
+        history: newHistory,
+        startedAt: undefined // Clear startedAt since task is done
+      };
+    }));
+  };
+
+  // Auto-pause on sleep/wake: if gap since last tick is >2 minutes, auto-pause working task
+  useEffect(() => {
+    const lastActive = localStorage.getItem('kanban-last-active');
+    const now = Date.now();
+    if (lastActive) {
+      const gap = now - parseInt(lastActive, 10);
+      if (gap > 120000) {
+        const activeTask = tasks.find(t => t.status === 'WORKING');
+        if (activeTask) {
+          toggleTimer(activeTask.id);
+          alert('Your task was automatically paused because your computer was inactive or asleep.');
+        }
+      }
+    }
+    // No cleanup needed
+    // Only run on mount and when tasks/toggleTimer change
+  }, [tasks, toggleTimer]);
+
+  // Auto-pause timer only when browser tab is closed or page is unloaded
+  useEffect(() => {
+    const activeTask = tasks.find(t => t.status === 'WORKING');
+    if (!activeTask) return;
+
+    // Handle page unload (closing tab, refreshing, Mac sleep)
+    const handleBeforeUnload = () => {
+      if (activeTask && activeTask.status === 'WORKING') {
+        // Save current state before unload
+        localStorage.setItem('kanban-paused-task', JSON.stringify({
+          taskId: activeTask.id,
+          pausedAt: new Date().toISOString()
+        }));
+      }
+    };
+
+    // Check for paused task on page load
+    const checkPausedTask = () => {
+      const pausedTaskData = localStorage.getItem('kanban-paused-task');
+      if (pausedTaskData) {
+        try {
+          const { taskId } = JSON.parse(pausedTaskData);
+          const task = tasks.find(t => t.id === taskId);
+          if (task && task.status === 'WORKING') {
+            // Task was paused due to page unload, show resume prompt
+            if (confirm(`Your task "${task.title}" was paused when you left the page. Would you like to resume it?`)) {
+              // Task is already in WORKING status, just continue
+            } else {
+              // User chose not to resume, move to IN_PROGRESS
+              toggleTimer(taskId);
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing paused task data:', error);
+        }
+        localStorage.removeItem('kanban-paused-task');
+      }
+    };
+
+    // Set up event listeners
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Check for paused task on mount
+    checkPausedTask();
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [tasks, toggleTimer]);
+
   const backlogCount = currentWorkspaceTasks.filter(t => t.status === 'NEW').length;
   const doneCount = currentWorkspaceTasks.filter(t => t.status === 'DONE').length;
 
   return (
-    <div className="relative min-h-[80vh] bg-background">
+    <div className="relative h-screen overflow-hidden bg-background">
       {/* Workspace/Board Title Selector (Top Left) */}
       {!showBacklog && !showDone && (
         <div className="absolute left-8 top-6 z-50 flex items-center select-none" ref={dropdownRef}>
@@ -440,6 +552,18 @@ export function KanbanBoard() {
                     }
                   }}
                   autoFocus
+                />
+              </div>
+              <div>
+                <label htmlFor="taskDescription" className="block text-sm font-medium text-foreground mb-3">
+                  Description (optional)
+                </label>
+                <textarea
+                  id="taskDescription"
+                  value={newTaskDescription}
+                  onChange={(e) => setNewTaskDescription(e.target.value)}
+                  placeholder="Add more details about this task..."
+                  className="w-full px-4 py-3 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 text-base min-h-[80px]"
                 />
               </div>
               
@@ -643,7 +767,7 @@ export function KanbanBoard() {
               </button>
               <button
                 className="ml-2 px-4 py-2 rounded-lg bg-muted text-foreground font-medium hover:bg-muted/80 transition-colors"
-                onClick={() => moveTask(activeTask.id, 'right')}
+                onClick={() => markTaskDone(activeTask.id)}
               >
                 Mark Done
               </button>
@@ -678,7 +802,7 @@ export function KanbanBoard() {
         )}
       </div>
       {/* Main Columns Centered */}
-      <div className="flex gap-8 justify-center overflow-x-auto p-4 sm:p-6 md:p-8 w-full z-10 mt-8">
+      <div className="flex h-full gap-8 justify-center items-stretch overflow-x-auto p-4 sm:p-6 md:p-8 w-full z-10">
         <KanbanColumn
           title={STATUS_LABELS['UP_NEXT']}
           status={'UP_NEXT'}

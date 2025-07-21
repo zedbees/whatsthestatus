@@ -142,7 +142,7 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
   const workingPercentage = totalTime > 0 ? Math.round((workingTime / totalTime) * 100) : 0;
 
   return (
-    <div className={`relative bg-card border border-border rounded-xl shadow-sm group overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 px-6 py-5 flex flex-col justify-between min-h-[140px]`}>
+    <div className={`relative bg-card border border-border rounded-xl shadow-sm group transition-all hover:shadow-md hover:-translate-y-0.5 px-6 py-5 flex flex-col justify-between`}>
       <div>
         <div
           className="font-semibold text-base text-foreground leading-snug line-clamp-3 mb-3"
@@ -150,6 +150,11 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
         >
           {task.title}
         </div>
+        {task.description && (
+          <div className="text-sm text-muted-foreground mb-2 whitespace-pre-line break-words">
+            {task.description}
+          </div>
+        )}
         
         {/* Working Time Highlight */}
         {workingTime > 0 && (
@@ -165,6 +170,21 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
                 {workingPercentage}% of total time
               </span>
             )}
+          </div>
+        )}
+
+        {/* Completion Info for Done Tasks */}
+        {task.status === 'DONE' && (
+          <div className="flex items-center gap-3 mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 text-blue-600 dark:text-blue-400">✓</div>
+              <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                Completed in {formatDuration(new Date(task.updatedAt).getTime() - new Date(task.createdAt).getTime())}
+              </span>
+            </div>
+            <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-full">
+              {new Date(task.updatedAt).toLocaleDateString()}
+            </span>
           </div>
         )}
 
