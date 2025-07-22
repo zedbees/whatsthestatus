@@ -155,6 +155,15 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
             {task.description}
           </div>
         )}
+        {task.tags && task.tags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2 mt-1">
+            {task.tags.map((tag, i) => (
+              <span key={i} className="bg-muted-foreground/10 text-xs rounded px-2 py-0.5 font-medium text-muted-foreground">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
         
         {/* Working Time Highlight */}
         {workingTime > 0 && (

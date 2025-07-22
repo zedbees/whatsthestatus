@@ -11,6 +11,7 @@ import { Button } from './ui/button';
 import { KanbanCard } from './KanbanCard';
 import { FloatingAnalyticsButton } from './FloatingAnalyticsButton';
 import { BarChart as ReBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend } from 'recharts';
+import CreatableSelect from 'react-select/creatable';
 
 interface Workspace {
   id: string;
@@ -48,6 +49,8 @@ export function KanbanBoard() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskStatus, setNewTaskStatus] = useState<TaskStatus>('NEW');
   const [newTaskDescription, setNewTaskDescription] = useState('');
+  // For react-select, tags are objects with label/value, but we store as string[]
+  const [newTaskTags, setNewTaskTags] = useState<string[]>([]);
   const [showBacklog, setShowBacklog] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -159,6 +162,7 @@ export function KanbanBoard() {
       id: crypto.randomUUID(),
       title: newTaskTitle.trim(),
       description: newTaskDescription.trim() || undefined,
+      tags: newTaskTags,
       status: newTaskStatus,
       workspaceId: currentWorkspace,
       createdAt: new Date().toISOString(),
@@ -171,12 +175,14 @@ export function KanbanBoard() {
     setTasks([...tasks, newTask]);
     setNewTaskTitle('');
     setNewTaskDescription('');
+    setNewTaskTags([]);
     setAddTaskModalOpen(false);
   };
 
   const handleCancelCreateTask = () => {
     setNewTaskTitle('');
     setNewTaskDescription('');
+    setNewTaskTags([]);
     setAddTaskModalOpen(false);
   };
 
@@ -686,6 +692,73 @@ export function KanbanBoard() {
                   onChange={(e) => setNewTaskDescription(e.target.value)}
                   placeholder="Add more details about this task..."
                   className="w-full px-4 py-3 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 text-base min-h-[80px]"
+                />
+              </div>
+              <div>
+                <label htmlFor="taskTags" className="block text-sm font-medium text-foreground mb-3">
+                  Tags
+                </label>
+                <CreatableSelect
+                  isMulti
+                  inputId="taskTags"
+                  placeholder="Add a tag and press enter..."
+                  value={newTaskTags.map(tag => ({ label: tag, value: tag }))}
+                  onChange={selected => setNewTaskTags(selected ? selected.map(opt => opt.value) : [])}
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base, state) => ({
+                      ...base,
+                      backgroundColor: 'var(--background)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--foreground)',
+                      boxShadow: state.isFocused ? '0 0 0 2px var(--primary)' : base.boxShadow,
+                    }),
+                    menu: (base) => ({
+                      ...base,
+                      backgroundColor: 'var(--card)',
+                      color: 'var(--foreground)',
+                      zIndex: 100,
+                    }),
+                    option: (base, state) => ({
+                      ...base,
+                      backgroundColor: state.isFocused
+                        ? 'var(--primary)/10'
+                        : 'var(--card)',
+                      color: 'var(--foreground)',
+                      cursor: 'pointer',
+                    }),
+                    multiValue: (base) => {
+                      const isDark = document.documentElement.classList.contains('dark');
+                      return {
+                        ...base,
+                        backgroundColor: isDark ? '#334155' : '#e0e7ff', // slate-700 for dark, indigo-100 for light
+                        color: isDark ? '#f1f5f9' : '#1e293b', // slate-100 for dark, slate-800 for light
+                        borderRadius: '6px',
+                        padding: '0 2px',
+                      };
+                    },
+                    multiValueLabel: (base) => {
+                      const isDark = document.documentElement.classList.contains('dark');
+                      return {
+                        ...base,
+                        color: isDark ? '#f1f5f9' : '#1e293b',
+                        fontWeight: 500,
+                      };
+                    },
+                    multiValueRemove: (base) => {
+                      const isDark = document.documentElement.classList.contains('dark');
+                      return {
+                        ...base,
+                        color: isDark ? '#f1f5f9' : '#1e293b',
+                        ':hover': {
+                          backgroundColor: isDark ? '#475569' : '#c7d2fe',
+                          color: isDark ? '#fff' : '#1e293b',
+                        },
+                      };
+                    },
+                    input: (base) => ({ ...base, color: 'var(--foreground)' }),
+                    placeholder: (base) => ({ ...base, color: 'var(--muted-foreground)' }),
+                  }}
                 />
               </div>
               

@@ -10,6 +10,7 @@ export interface Task {
   id: string;
   title: string;
   description?: string; // Optional description for the task
+  tags?: string[]; // Free-form tags for the task
   status: TaskStatus;
   workspaceId: string; // which workspace/board this task belongs to
   createdAt: string;
