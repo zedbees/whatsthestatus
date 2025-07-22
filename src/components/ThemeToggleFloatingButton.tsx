@@ -37,13 +37,13 @@ export function ThemeToggleFloatingButton() {
       size="icon"
       variant="ghost"
       onClick={toggleTheme}
-      className="fixed top-4 right-4 z-50 w-10 h-10 bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-foreground hover:bg-background/90 transition-all duration-200 shadow-sm hover:shadow-md"
+      className="border-border"
       aria-label="Toggle theme"
     >
       {theme.isDark ? (
-        <Sun className="h-4 w-4" />
+        <Sun className="h-6 w-6" />
       ) : (
-        <Moon className="h-4 w-4" />
+        <Moon className="h-6 w-6" />
       )}
     </Button>
   );

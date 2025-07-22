@@ -145,13 +145,13 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer }: Ka
     <div className={`relative bg-card border border-border rounded-xl shadow-sm group transition-all hover:shadow-md hover:-translate-y-0.5 px-6 py-5 flex flex-col justify-between`}>
       <div>
         <div
-          className="font-semibold text-base text-foreground leading-snug line-clamp-3 mb-3"
+          className="font-semibold text-base leading-snug mb-2 text-foreground"
           title={task.title}
         >
           {task.title}
         </div>
         {task.description && (
-          <div className="text-sm text-muted-foreground mb-2 whitespace-pre-line break-words">
+          <div className="text-base text-muted-foreground leading-relaxed mb-2 whitespace-pre-line break-words">
             {task.description}
           </div>
         )}
