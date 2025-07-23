@@ -11,9 +11,10 @@ interface KanbanColumnProps {
   onEdit: (id: string) => void;
   onMove: (id: string, direction: 'left' | 'right') => void;
   onToggleTimer: (id: string) => void;
+  onShowDetails: (id: string) => void;
 }
 
-export function KanbanColumn({ title, status, tasks, onAdd, onDelete, onEdit, onMove, onToggleTimer }: KanbanColumnProps) {
+export function KanbanColumn({ title, status, tasks, onAdd, onDelete, onEdit, onMove, onToggleTimer, onShowDetails }: KanbanColumnProps) {
   const isActiveColumn = status === 'IN_PROGRESS';
   
   return (
@@ -39,6 +40,7 @@ export function KanbanColumn({ title, status, tasks, onAdd, onDelete, onEdit, on
             onEdit={onEdit}
             onMove={onMove}
             onToggleTimer={onToggleTimer}
+            onShowDetails={onShowDetails}
           />
           ))
         )}

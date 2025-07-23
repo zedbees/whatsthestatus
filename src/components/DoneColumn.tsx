@@ -9,9 +9,10 @@ interface DoneColumnProps {
   onEdit: (id: string) => void;
   onMove: (id: string, direction: 'left' | 'right') => void;
   onToggleTimer: (id: string) => void;
+  onShowDetails: (id: string) => void;
 }
 
-export function DoneColumn({ tasks, onDelete, onEdit, onMove, onToggleTimer }: DoneColumnProps) {
+export function DoneColumn({ tasks, onDelete, onEdit, onMove, onToggleTimer, onShowDetails }: DoneColumnProps) {
   const [collapsed, setCollapsed] = useState(true);
   return (
     <div className="flex flex-col bg-column border border-border rounded-2xl shadow-sm min-w-[280px] max-w-xs px-6 py-6">
@@ -29,6 +30,7 @@ export function DoneColumn({ tasks, onDelete, onEdit, onMove, onToggleTimer }: D
               onEdit={onEdit}
               onMove={onMove}
               onToggleTimer={onToggleTimer}
+              onShowDetails={onShowDetails}
             />
           ))}
         </div>

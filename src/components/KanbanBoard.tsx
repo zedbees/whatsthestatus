@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Task, TaskStatus } from '../types/tasks';
 import { KanbanColumn } from './KanbanColumn';
 import { FloatingAddButton } from './FloatingAddButton';
@@ -12,6 +12,7 @@ import { KanbanCard } from './KanbanCard';
 import { FloatingAnalyticsButton } from './FloatingAnalyticsButton';
 import { BarChart as ReBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend } from 'recharts';
 import CreatableSelect from 'react-select/creatable';
+import { Edit2, Trash2, Play, Pause, ArrowRight, Clock, Calendar as CalendarIcon, Clock as ClockIcon } from 'lucide-react';
 
 interface Workspace {
   id: string;
@@ -28,6 +29,261 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 const DEMO_TASKS: Task[] = [];
+
+// PieChart for analytics (reuse from KanbanCard, but inline here)
+function PieChart({ data, size = 60 }: { data: Array<{ label: string; value: number; color: string }>; size?: number }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  if (total === 0) return null;
+  const center = size / 2;
+  const radius = center - 4;
+  let currentAngle = -Math.PI / 2;
+  const paths = data.map((item, index) => {
+    const percentage = item.value / total;
+    const angle = percentage * 2 * Math.PI;
+    const endAngle = currentAngle + angle;
+    const x1 = center + radius * Math.cos(currentAngle);
+    const y1 = center + radius * Math.sin(currentAngle);
+    const x2 = center + radius * Math.cos(endAngle);
+    const y2 = center + radius * Math.sin(endAngle);
+    const largeArcFlag = angle > Math.PI ? 1 : 0;
+    const pathData = [
+      `M ${center} ${center}`,
+      `L ${x1} ${y1}`,
+      `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+      'Z'
+    ].join(' ');
+    currentAngle = endAngle;
+    return (
+      <path
+        key={index}
+        d={pathData}
+        fill={item.color}
+        stroke="white"
+        strokeWidth="1"
+      />
+    );
+  });
+  return (
+    <svg width={size} height={size} className="flex-shrink-0">{paths}</svg>
+  );
+}
+// Helper for formatting durations
+function formatDuration(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const m = Math.ceil(s / 60);
+  if (m < 60) return `${m} minute${m !== 1 ? 's' : ''}`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hour${h !== 1 ? 's' : ''}`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} day${d !== 1 ? 's' : ''}`;
+  const w = Math.floor(d / 7);
+  if (w < 4) return `${w} week${w !== 1 ? 's' : ''}`;
+  const mo = Math.floor(d / 30);
+  return `${mo} month${mo !== 1 ? 's' : ''}`;
+}
+// Helper for formatting time
+function formatTime(s: number) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+}
+
+function statusBadge(status: string) {
+  const colorMap: Record<string, string> = {
+    'NEW': 'bg-gray-200 text-gray-700',
+    'UP_NEXT': 'bg-indigo-100 text-indigo-700',
+    'WORKING': 'bg-green-100 text-green-700',
+    'IN_PROGRESS': 'bg-blue-100 text-blue-700',
+    'BLOCKED': 'bg-yellow-100 text-yellow-800',
+    'DONE': 'bg-green-200 text-green-800',
+  };
+  return (
+    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${colorMap[status] || 'bg-gray-100 text-gray-700'}`}>{status.replace('_', ' ')}</span>
+  );
+}
+function formatShortDate(date: string) {
+  const d = new Date(date);
+  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+// Placeholder for TaskDetailsPanel
+function TaskDetailsPanel({ task, onClose }: { task: Task | null, onClose: () => void }) {
+  const [elapsed, setElapsed] = useState(0);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Timer for live elapsed time
+  useEffect(() => {
+    if (task && task.status === 'WORKING' && task.startedAt) {
+      const interval = setInterval(() => {
+        const now = Date.now();
+        const currentSessionTime = Math.floor((now - new Date(task.startedAt!).getTime()) / 1000);
+        const totalElapsed = Math.floor((task.totalWorkingTime || 0) / 1000) + currentSessionTime;
+        setElapsed(totalElapsed);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [task]);
+  // Close on Escape key
+  useEffect(() => {
+    if (!task) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [task, onClose]);
+  // Prevent click inside panel from closing
+  const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
+  if (!task) return (
+    <div className="fixed top-0 right-0 h-full w-full max-w-lg z-50 bg-background border-l border-border shadow-2xl transition-transform duration-300 translate-x-full" />
+  );
+  // Pie chart/time breakdown logic (reuse from KanbanCard)
+  const stateDisplay: Record<string, { label: string; color: string }> = {
+    UP_NEXT: { label: 'Up Next', color: '#a5b4fc' },
+    WORKING: { label: 'Working', color: '#10b981' },
+    IN_PROGRESS: { label: 'In Progress', color: '#fbbf24' },
+    BLOCKED: { label: 'Blocked', color: '#fca5a5' },
+    NEW: { label: 'Backlog', color: '#d1d5db' },
+    DONE: { label: 'Done', color: '#c7d2fe' },
+  };
+  const statusTotals: Record<string, { totalMs: number; isCurrent: boolean }> = {};
+  task.history.forEach(entry => {
+    const start = new Date(entry.enteredAt).getTime();
+    const end = entry.exitedAt
+      ? new Date(entry.exitedAt).getTime()
+      : (entry.status === 'WORKING' ? Date.now() : start);
+    const durationMs = end - start;
+    if (!statusTotals[entry.status]) {
+      statusTotals[entry.status] = { totalMs: 0, isCurrent: false };
+    }
+    statusTotals[entry.status].totalMs += durationMs;
+    statusTotals[entry.status].isCurrent = !entry.exitedAt;
+  });
+  const pieData = Object.entries(statusTotals)
+    .filter(([_, data]) => data.totalMs > 0)
+    .map(([status, data]) => ({
+      label: stateDisplay[status]?.label || status,
+      value: data.totalMs,
+      color: stateDisplay[status]?.color || '#e5e7eb',
+      isCurrent: data.isCurrent
+    }))
+    .sort((a, b) => b.value - a.value);
+  const workingTime = statusTotals['WORKING']?.totalMs || 0;
+  const totalTime = Object.values(statusTotals).reduce((sum, data) => sum + data.totalMs, 0);
+  const workingPercentage = totalTime > 0 ? Math.round((workingTime / totalTime) * 100) : 0;
+  return (
+    <>
+      {/* Backdrop */}
+      {task && (
+        <div className="fixed inset-0 z-40 bg-black/30 animate-in fade-in" onClick={onClose} />
+      )}
+      {/* Panel */}
+      <div
+        ref={panelRef}
+        className={`fixed top-0 right-0 h-full w-full max-w-lg z-50 bg-background border-l border-border shadow-2xl transition-transform duration-300 ${task ? 'translate-x-0' : 'translate-x-full'} dark:bg-[#232329] dark:border-[#393943]`}
+        style={{ boxShadow: 'rgba(0,0,0,0.15) -8px 0 32px 0' }}
+        onClick={stopPropagation}
+      >
+        <button className="absolute top-4 right-6 text-muted-foreground hover:text-foreground" onClick={onClose} aria-label="Close details">✕</button>
+        <div className="p-8 flex flex-col gap-6 h-full overflow-y-auto">
+          {/* Header: Status badge, Title, Tags */}
+          <div className="flex flex-col gap-2 mb-2">
+            <div className="flex items-center gap-3 mb-1">
+              {statusBadge(task.status)}
+              {task.tags && task.tags.length > 0 && (
+                <span className="flex flex-wrap gap-1">
+                  {task.tags.map((tag, i) => (
+                    <span key={i} className="inline-block px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-100">{tag}</span>
+                  ))}
+                </span>
+              )}
+            </div>
+            <h2 className="text-2xl font-bold leading-tight mb-1">{task.title}</h2>
+          </div>
+          {/* Dates */}
+          <div className="flex items-center gap-6 text-xs text-muted-foreground mb-2">
+            <span className="flex items-center gap-1"><CalendarIcon className="w-4 h-4" />{formatShortDate(task.createdAt)}</span>
+            <span className="flex items-center gap-1"><ClockIcon className="w-4 h-4" />{formatShortDate(task.updatedAt)}</span>
+          </div>
+          <hr className="my-2 border-border" />
+          {/* Description */}
+          <div className="mb-6">
+            <div className="text-sm font-semibold text-muted-foreground mb-1">Description</div>
+            <div className="text-base text-foreground leading-relaxed whitespace-pre-line break-words bg-card rounded p-3 border border-border min-h-[40px]">
+              {task.description ? task.description : <span className="text-muted-foreground">No description</span>}
+            </div>
+          </div>
+          {/* Worked time and timer */}
+          <div className="flex items-center gap-3 mb-2">
+            {workingTime > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800 text-xs text-green-700 dark:text-green-300 font-semibold">
+                <Clock className="w-4 h-4" />
+                Worked: {formatDuration(workingTime)}
+                {totalTime > 0 && (
+                  <span className="ml-2 text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-800 px-2 py-1 rounded-full">
+                    {workingPercentage}% of total time
+                  </span>
+                )}
+              </div>
+            )}
+            {task.status === 'WORKING' && (
+              <span className="text-xs text-green-600 dark:text-green-400 font-mono font-semibold">
+                {formatTime(elapsed)}
+              </span>
+            )}
+          </div>
+          {/* Completion info */}
+          {task.status === 'DONE' && (
+            <div className="flex items-center gap-3 mb-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="w-4 h-4 text-blue-600 dark:text-blue-400">✓</div>
+              <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                Completed in {formatDuration(new Date(task.updatedAt).getTime() - new Date(task.createdAt).getTime())}
+              </span>
+              <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-full">
+                {new Date(task.updatedAt).toLocaleDateString()}
+              </span>
+            </div>
+          )}
+          {/* Analytics Pie Chart and Legend */}
+          {pieData.length > 0 && (
+            <div className="flex items-start gap-4 mb-2">
+              <PieChart data={pieData} size={60} />
+              <div className="flex-1">
+                <div className="text-xs text-muted-foreground mb-2 font-medium">Time Distribution</div>
+                <div className="space-y-1">
+                  {pieData.slice(0, 4).map((item, index) => (
+                    <div key={index} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="text-foreground">{item.label}</span>
+                      </div>
+                      <span className="text-muted-foreground font-mono">{formatDuration(item.value)}</span>
+                    </div>
+                  ))}
+                  {pieData.length > 4 && (
+                    <div className="text-xs text-muted-foreground italic">+{pieData.length - 4} more statuses</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Actions */}
+          <div className="flex gap-2 mt-4">
+            <button className="p-2 rounded-lg bg-card border border-border shadow hover:bg-muted text-foreground hover:text-primary transition" title="Edit"><Edit2 className="w-5 h-5" /></button>
+            <button className="p-2 rounded-lg bg-card border border-border shadow hover:bg-red-100 text-foreground hover:text-red-600 transition" title="Delete"><Trash2 className="w-5 h-5" /></button>
+            <button className="p-2 rounded-lg bg-card border border-border shadow hover:bg-muted text-foreground hover:text-primary transition" title="Move Left"><ArrowRight className="w-5 h-5 rotate-180" /></button>
+            <button className="p-2 rounded-lg bg-card border border-border shadow hover:bg-muted text-foreground hover:text-primary transition" title="Move Right"><ArrowRight className="w-5 h-5" /></button>
+            {task.status === 'WORKING' ? (
+              <button className="p-2 rounded-lg bg-card border border-border shadow hover:bg-yellow-100 text-foreground hover:text-yellow-600 transition" title="Pause"><Pause className="w-5 h-5" /></button>
+            ) : (
+              <button className="p-2 rounded-lg bg-card border border-border shadow hover:bg-green-100 text-foreground hover:text-green-600 transition" title="Start"><Play className="w-5 h-5" /></button>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
 
 export function KanbanBoard() {
   const [tasks, setTasks] = useState<Task[]>(() => {
@@ -57,6 +313,10 @@ export function KanbanBoard() {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [detailsTaskId, setDetailsTaskId] = useState<string | null>(null);
+  const detailsTask = detailsTaskId ? tasks.find(t => t.id === detailsTaskId) || null : null;
+  const handleShowDetails = useCallback((id: string) => setDetailsTaskId(id), []);
+  const handleCloseDetails = useCallback(() => setDetailsTaskId(null), []);
 
   // Update current time every second for live timer
   useEffect(() => {
@@ -891,6 +1151,7 @@ export function KanbanBoard() {
                     onEdit={editTask}
                     onMove={moveTask}
                     onToggleTimer={toggleTimer}
+                    onShowDetails={handleShowDetails}
                   />
                 ))
               )}
@@ -929,6 +1190,7 @@ export function KanbanBoard() {
                     onEdit={editTask}
                     onMove={moveTask}
                     onToggleTimer={toggleTimer}
+                    onShowDetails={handleShowDetails}
                   />
                 ))
               )}
@@ -1007,6 +1269,7 @@ export function KanbanBoard() {
           onEdit={editTask}
           onMove={moveTask}
           onToggleTimer={toggleTimer}
+          onShowDetails={handleShowDetails}
         />
         <KanbanColumn
           title={STATUS_LABELS['IN_PROGRESS']}
@@ -1017,6 +1280,7 @@ export function KanbanBoard() {
           onEdit={editTask}
           onMove={moveTask}
           onToggleTimer={toggleTimer}
+          onShowDetails={handleShowDetails}
         />
         <KanbanColumn
           title={STATUS_LABELS['BLOCKED']}
@@ -1027,9 +1291,12 @@ export function KanbanBoard() {
           onEdit={editTask}
           onMove={moveTask}
           onToggleTimer={toggleTimer}
+          onShowDetails={handleShowDetails}
         />
       </div>
       {analyticsOpen === false && <FloatingAddButton onClick={() => addTask('NEW')} />}
+      {/* Slide-in Task Details Panel */}
+      <TaskDetailsPanel task={detailsTask} onClose={handleCloseDetails} />
     </div>
   );
 } 
