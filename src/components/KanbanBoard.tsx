@@ -10,7 +10,7 @@ import { ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { KanbanCard } from './KanbanCard';
 import { FloatingAnalyticsButton } from './FloatingAnalyticsButton';
-import { BarChart as ReBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend } from 'recharts';
+import { AnalyticsModal } from './AnalyticsModal';
 import CreatableSelect from 'react-select/creatable';
 import { Edit2, Trash2, Play, Pause, ArrowRight, Clock, Calendar as CalendarIcon, Clock as ClockIcon } from 'lucide-react';
 
@@ -1031,119 +1031,12 @@ export function KanbanBoard() {
       )}
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
       {/* Analytics Modal */}
-      {analyticsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="relative w-full h-full max-w-full max-h-full bg-background border border-border rounded-none shadow-xl flex flex-col">
-            <button
-              className="absolute top-6 right-8 text-muted-foreground hover:text-foreground transition-colors z-10"
-              onClick={() => setAnalyticsOpen(false)}
-              aria-label="Close Analytics"
-            >
-              <X className="w-7 h-7" />
-            </button>
-            <div className="flex items-center justify-center py-8 border-b border-border">
-              <h2 className="text-3xl font-bold text-foreground">Analytics & Insights</h2>
-            </div>
-            <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center justify-start gap-12">
-              {/* Key Metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 w-full max-w-5xl mb-8">
-                <div className="bg-card rounded-xl p-6 shadow flex flex-col items-center">
-                  <div className="text-2xl font-bold text-primary">{tasks.length}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Total Tickets</div>
-                </div>
-                <div className="bg-card rounded-xl p-6 shadow flex flex-col items-center">
-                  <div className="text-2xl font-bold text-green-600">{tasks.filter(t => t.status === 'DONE').length}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Completed</div>
-                </div>
-                <div className="bg-card rounded-xl p-6 shadow flex flex-col items-center">
-                  <div className="text-2xl font-bold text-yellow-600">{tasks.filter(t => t.status !== 'DONE').length}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Pending</div>
-                </div>
-                <div className="bg-card rounded-xl p-6 shadow flex flex-col items-center">
-                  <div className="text-2xl font-bold text-blue-600">{Math.round(tasks.reduce((sum, t) => sum + (t.totalWorkingTime || 0), 0) / 3600000)}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Total Hours Worked</div>
-                </div>
-              </div>
-              {/* Tickets by Status Bar Chart */}
-              <div className="w-full max-w-3xl bg-card rounded-xl p-6 shadow flex flex-col items-center">
-                <div className="text-lg font-semibold mb-4">Tickets by Status</div>
-                <ResponsiveContainer width="100%" height={220}>
-                  <ReBarChart data={['NEW','UP_NEXT','WORKING','IN_PROGRESS','BLOCKED','DONE'].map(status => ({
-                    label: status.replace('_',' '),
-                    value: tasks.filter(t => t.status === status).length
-                  }))} margin={{ left: 10, right: 10, top: 10, bottom: 30 }}>
-                    <XAxis dataKey="label" angle={-20} textAnchor="end" interval={0} height={50} tick={{ fontSize: 13, fill: '#888' }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 13, fill: '#888' }} />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#6366f1">
-                      {['#a5b4fc','#fbbf24','#10b981','#f59e42','#fca5a5','#c7d2fe'].map((color, i) => (
-                        <Cell key={i} fill={color} />
-                      ))}
-                    </Bar>
-                  </ReBarChart>
-                </ResponsiveContainer>
-              </div>
-              {/* Tickets per Board Bar Chart */}
-              <div className="w-full max-w-3xl bg-card rounded-xl p-6 shadow flex flex-col items-center">
-                <div className="text-lg font-semibold mb-4">Tickets per Board</div>
-                <ResponsiveContainer width="100%" height={220}>
-                  <ReBarChart data={workspaces.map(ws => ({
-                    label: ws.name,
-                    value: tasks.filter(t => t.workspaceId === ws.id).length
-                  }))} margin={{ left: 10, right: 10, top: 10, bottom: 30 }}>
-                    <XAxis dataKey="label" angle={-20} textAnchor="end" interval={0} height={50} tick={{ fontSize: 13, fill: '#888' }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 13, fill: '#888' }} />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#6366f1">
-                      {['#60a5fa','#818cf8','#fbbf24','#10b981','#fca5a5','#c7d2fe'].map((color, i) => (
-                        <Cell key={i} fill={color} />
-                      ))}
-                    </Bar>
-                  </ReBarChart>
-                </ResponsiveContainer>
-              </div>
-              {/* Time Distribution Pie Chart */}
-              <div className="w-full max-w-3xl bg-card rounded-xl p-6 shadow flex flex-col items-center">
-                <div className="text-lg font-semibold mb-4">Time Distribution (All Tickets)</div>
-                <ResponsiveContainer width={320} height={220}>
-                  <RePieChart>
-                    <Pie
-                      data={(() => {
-                        const statusTotals: Record<string, number> = {};
-                        tasks.forEach(task => {
-                          (task.history || []).forEach(entry => {
-                            const start = new Date(entry.enteredAt).getTime();
-                            const end = entry.exitedAt ? new Date(entry.exitedAt).getTime() : start;
-                            const duration = Math.max(0, end - start);
-                            if (!statusTotals[entry.status]) statusTotals[entry.status] = 0;
-                            statusTotals[entry.status] += duration;
-                          });
-                        });
-                        return Object.entries(statusTotals).map(([status, value]) => ({
-                          label: status.replace('_',' '),
-                          value: value as number
-                        }));
-                      })()}
-                      dataKey="value"
-                      nameKey="label"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
-                    >
-                      {['#a5b4fc','#fbbf24','#10b981','#f59e42','#fca5a5','#c7d2fe'].map((color, i) => (
-                        <Cell key={i} fill={color} />
-                      ))}
-                    </Pie>
-                    <Legend />
-                    <Tooltip />
-                  </RePieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <AnalyticsModal 
+        open={analyticsOpen} 
+        onClose={() => setAnalyticsOpen(false)} 
+        tasks={tasks} 
+        workspaces={workspaces} 
+      />
       {/* Add Board Modal */}
       {addBoardModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
