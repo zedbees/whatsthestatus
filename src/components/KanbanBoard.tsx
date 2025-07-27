@@ -108,9 +108,149 @@ function formatShortDate(date: string) {
 }
 
 // Placeholder for TaskDetailsPanel
-function TaskDetailsPanel({ task, onClose }: { task: Task | null, onClose: () => void }) {
+function TaskDetailsPanel({ task, onClose, onUpdateTask }: { task: Task | null, onClose: () => void, onUpdateTask?: (taskId: string, updates: Partial<Task>) => void }) {
   const [elapsed, setElapsed] = useState(0);
+  const [editingTags, setEditingTags] = useState<string[]>(task?.tags || []);
+  const [newTag, setNewTag] = useState('');
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [titleValue, setTitleValue] = useState(task?.title || '');
+  const [descriptionValue, setDescriptionValue] = useState(task?.description || '');
   const panelRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Calculate task age
+  const getTaskAge = (createdAt: string) => {
+    const created = new Date(createdAt);
+    const now = new Date();
+    const diffMs = now.getTime() - created.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+    if (diffDays > 0) {
+      return diffDays === 1 ? '1d ago' : `${diffDays}d ago`;
+    } else if (diffHours > 0) {
+      return diffHours === 1 ? '1h ago' : `${diffHours}h ago`;
+    } else if (diffMinutes > 0) {
+      return diffMinutes === 1 ? '1m ago' : `${diffMinutes}m ago`;
+    } else {
+      return 'Just now';
+    }
+  };
+
+  // Get age color based on how old the task is
+  const getAgeColor = (createdAt: string) => {
+    const created = new Date(createdAt);
+    const now = new Date();
+    const diffMs = now.getTime() - created.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays >= 7) return 'text-red-500 dark:text-red-400'; // Old - red
+    if (diffDays >= 3) return 'text-orange-500 dark:text-orange-400'; // Medium - orange
+    if (diffDays >= 1) return 'text-yellow-500 dark:text-yellow-400'; // Recent - yellow
+    return 'text-green-500 dark:text-green-400'; // New - green
+  };
+
+  // Tag management functions
+  const addTag = () => {
+    if (newTag.trim() && !editingTags.includes(newTag.trim())) {
+      setEditingTags([...editingTags, newTag.trim()]);
+      setNewTag('');
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setEditingTags(editingTags.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleTagKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTag();
+    }
+  };
+
+  // Save tags when they change
+  const saveTags = () => {
+    if (task && onUpdateTask && JSON.stringify(editingTags) !== JSON.stringify(task.tags)) {
+      onUpdateTask(task.id, {
+        tags: editingTags,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  };
+
+  // Auto-save tags when editingTags changes
+  useEffect(() => {
+    if (task && onUpdateTask) {
+      const timeoutId = setTimeout(saveTags, 1000); // Debounce for 1 second
+      return () => clearTimeout(timeoutId);
+    }
+  }, [editingTags, task, onUpdateTask]);
+
+  // Inline editing functions
+  const startEditingTitle = () => {
+    setEditingTitle(true);
+    setTitleValue(task?.title || '');
+    setTimeout(() => titleInputRef.current?.focus(), 0);
+  };
+
+  const saveTitle = () => {
+    if (task && onUpdateTask && titleValue.trim() !== task.title) {
+      onUpdateTask(task.id, {
+        title: titleValue.trim(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+    setEditingTitle(false);
+  };
+
+  const cancelTitleEdit = () => {
+    setTitleValue(task?.title || '');
+    setEditingTitle(false);
+  };
+
+  const startEditingDescription = () => {
+    setEditingDescription(true);
+    setDescriptionValue(task?.description || '');
+    setTimeout(() => descriptionInputRef.current?.focus(), 0);
+  };
+
+  const saveDescription = () => {
+    if (task && onUpdateTask && descriptionValue !== task.description) {
+      onUpdateTask(task.id, {
+        description: descriptionValue || undefined,
+        updatedAt: new Date().toISOString()
+      });
+    }
+    setEditingDescription(false);
+  };
+
+  const cancelDescriptionEdit = () => {
+    setDescriptionValue(task?.description || '');
+    setEditingDescription(false);
+  };
+
+  // Handle keyboard events for inline editing
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveTitle();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelTitleEdit();
+    }
+  };
+
+  const handleDescriptionKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelDescriptionEdit();
+    }
+  };
+  
   // Timer for live elapsed time
   useEffect(() => {
     if (task && task.status === 'WORKING' && task.startedAt) {
@@ -186,10 +326,18 @@ function TaskDetailsPanel({ task, onClose }: { task: Task | null, onClose: () =>
       >
         <button className="absolute top-4 right-6 text-muted-foreground hover:text-foreground" onClick={onClose} aria-label="Close details">✕</button>
         <div className="p-8 flex flex-col gap-6 h-full overflow-y-auto">
-          {/* Header: Status badge, Title, Tags */}
+          {/* Header: Status badge, Age, Worked Time, Title, Tags */}
           <div className="flex flex-col gap-2 mb-2">
             <div className="flex items-center gap-3 mb-1">
               {statusBadge(task.status)}
+              <span className={`text-xs font-medium ${getAgeColor(task.createdAt)}`}>
+                {getTaskAge(task.createdAt)}
+              </span>
+              {workingTime > 0 && (
+                <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded border border-green-200 dark:border-green-800">
+                  {formatDuration(workingTime)}
+                </span>
+              )}
               {task.tags && task.tags.length > 0 && (
                 <span className="flex flex-wrap gap-1">
                   {task.tags.map((tag, i) => (
@@ -198,7 +346,28 @@ function TaskDetailsPanel({ task, onClose }: { task: Task | null, onClose: () =>
                 </span>
               )}
             </div>
-            <h2 className="text-2xl font-bold leading-tight mb-1">{task.title}</h2>
+            {editingTitle ? (
+              <div className="mb-1">
+                <input
+                  ref={titleInputRef}
+                  type="text"
+                  value={titleValue}
+                  onChange={(e) => setTitleValue(e.target.value)}
+                  onKeyDown={handleTitleKeyDown}
+                  onBlur={saveTitle}
+                  className="text-2xl font-bold leading-tight bg-transparent border-none outline-none focus:ring-2 focus:ring-primary focus:ring-inset rounded px-2 py-1 w-full"
+                  placeholder="Enter task title..."
+                />
+              </div>
+            ) : (
+              <h2 
+                className="text-2xl font-bold leading-tight mb-1 cursor-pointer hover:bg-muted/50 rounded px-2 py-1 transition-colors"
+                onClick={startEditingTitle}
+                title="Click to edit title"
+              >
+                {task.title}
+              </h2>
+            )}
           </div>
           {/* Dates */}
           <div className="flex items-center gap-6 text-xs text-muted-foreground mb-2">
@@ -209,8 +378,70 @@ function TaskDetailsPanel({ task, onClose }: { task: Task | null, onClose: () =>
           {/* Description */}
           <div className="mb-6">
             <div className="text-sm font-semibold text-muted-foreground mb-1">Description</div>
-            <div className="text-base text-foreground leading-relaxed whitespace-pre-line break-words bg-card rounded p-3 border border-border min-h-[40px]">
-              {task.description ? task.description : <span className="text-muted-foreground">No description</span>}
+            {editingDescription ? (
+              <div className="relative">
+                <textarea
+                  ref={descriptionInputRef}
+                  value={descriptionValue}
+                  onChange={(e) => setDescriptionValue(e.target.value)}
+                  onKeyDown={handleDescriptionKeyDown}
+                  onBlur={saveDescription}
+                  className="w-full text-base text-foreground leading-relaxed whitespace-pre-line break-words bg-card rounded p-3 border border-border min-h-[100px] resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Add a description..."
+                />
+                <div className="absolute top-2 right-2 text-xs text-muted-foreground">
+                  Press Esc to cancel
+                </div>
+              </div>
+            ) : (
+              <div 
+                className="text-base text-foreground leading-relaxed whitespace-pre-line break-words bg-card rounded p-3 border border-border min-h-[40px] cursor-pointer hover:bg-muted/20 transition-colors"
+                onClick={startEditingDescription}
+                title="Click to edit description"
+              >
+                {task.description ? task.description : <span className="text-muted-foreground">No description</span>}
+              </div>
+            )}
+          </div>
+          {/* Tags */}
+          <div className="mb-6">
+            <div className="text-sm font-semibold text-muted-foreground mb-2">Tags</div>
+            <div className="space-y-3">
+              {/* Existing tags */}
+              {editingTags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {editingTags.map((tag, index) => (
+                    <span key={index} className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm font-medium border border-indigo-100">
+                      {tag}
+                      <button
+                        onClick={() => removeTag(tag)}
+                        className="ml-1 text-indigo-500 hover:text-indigo-700 transition-colors"
+                        title="Remove tag"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {/* Add new tag */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyPress={handleTagKeyPress}
+                  placeholder="Add a tag..."
+                  className="flex-1 px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                />
+                <button
+                  onClick={addTag}
+                  disabled={!newTag.trim()}
+                  className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                >
+                  Add
+                </button>
+              </div>
             </div>
           </div>
           {/* Worked time and timer */}
@@ -330,6 +561,7 @@ export function KanbanBoard() {
 
 
 
+
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -419,15 +651,15 @@ export function KanbanBoard() {
     if (!newTaskTitle.trim()) return;
     
     const newTask: Task = {
-      id: crypto.randomUUID(),
+        id: crypto.randomUUID(),
       title: newTaskTitle.trim(),
       description: newTaskDescription.trim() || undefined,
       tags: newTaskTags,
       status: newTaskStatus,
       workspaceId: currentWorkspace,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      history: [
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        history: [
         { status: newTaskStatus, enteredAt: new Date().toISOString() }
       ]
     };
@@ -450,17 +682,8 @@ export function KanbanBoard() {
 
   const deleteTask = (id: string) => setTasks(tasks.filter(t => t.id !== id));
   const editTask = (id: string) => {
-    const currentTask = tasks.find(t => t.id === id);
-    if (!currentTask) return;
-    
-    const title = window.prompt('Edit task title:', currentTask.title);
-    if (!title || title.trim() === '') return;
-    
-    setTasks(tasks.map(t => 
-      t.id === id 
-        ? { ...t, title: title.trim(), updatedAt: new Date().toISOString() } 
-        : t
-    ));
+    // Open the task details panel for editing
+    setDetailsTaskId(id);
   };
   const moveTask = (id: string, direction: 'left' | 'right') => {
     setTasks(tasks => tasks.map(t => {
@@ -616,36 +839,99 @@ export function KanbanBoard() {
     }));
   };
 
-  // Auto-pause on sleep/wake: if gap since last tick is >2 minutes, auto-pause working task
-  useEffect(() => {
-    const lastActive = localStorage.getItem('kanban-last-active');
+  // Update task function for TaskDetailsPanel
+  const updateTask = (taskId: string, updates: Partial<Task>) => {
+    setTasks(tasks => tasks.map(t => 
+      t.id === taskId 
+        ? { ...t, ...updates }
+        : t
+    ));
+  };
+
+  // Comprehensive inactivity detection - runs on mount, visibility change, and storage changes
+  const checkAndHandleInactivity = useCallback(() => {
+    const lastActiveStr = localStorage.getItem('kanban-last-active');
     const now = Date.now();
-    if (lastActive) {
-      const gap = now - parseInt(lastActive, 10);
-      if (gap > 120000) {
+    if (lastActiveStr) {
+      const lastActive = parseInt(lastActiveStr, 10);
+      const gap = now - lastActive;
+      if (gap > 120000) { // 2 minutes
         const activeTask = tasks.find(t => t.status === 'WORKING');
         if (activeTask) {
-          toggleTimer(activeTask.id);
-          alert('Your task was automatically paused because your computer was inactive or asleep.');
+          // Only count time up to lastActive, not now
+          const startedAt = activeTask.startedAt ? new Date(activeTask.startedAt).getTime() : null;
+          let sessionTime = 0;
+          if (startedAt && lastActive > startedAt) {
+            sessionTime = lastActive - startedAt;
+          }
+          const totalWorkingTime = (activeTask.totalWorkingTime || 0) + sessionTime;
+          // Update history: close WORKING, add IN_PROGRESS
+          const newHistory = [...activeTask.history];
+          if (newHistory.length > 0 && newHistory[newHistory.length - 1].status === 'WORKING' && !newHistory[newHistory.length - 1].exitedAt) {
+            newHistory[newHistory.length - 1].exitedAt = new Date(lastActive).toISOString();
+          }
+          const existingInProgressEntry = newHistory.find(entry => entry.status === 'IN_PROGRESS' && !entry.exitedAt);
+          if (!existingInProgressEntry) {
+            newHistory.push({ status: 'IN_PROGRESS', enteredAt: new Date(lastActive).toISOString() });
+          }
+          // Update the task in state
+          setTasks(tasks => tasks.map(t =>
+            t.id === activeTask.id
+              ? {
+                  ...t,
+                  status: 'IN_PROGRESS',
+                  startedAt: undefined,
+                  totalWorkingTime,
+                  history: newHistory
+                }
+              : t
+          ));
+          alert('Your task was automatically paused because your computer was inactive or asleep. The time while your Mac was closed was not counted.');
         }
       }
     }
-    // No cleanup needed
-    // Only run on mount and when tasks/toggleTimer change
-  }, [tasks, toggleTimer]);
+  }, [tasks]);
 
-  // Auto-pause timer only when browser tab is closed or page is unloaded
+  // Check for inactivity on mount
+  useEffect(() => {
+    checkAndHandleInactivity();
+  }, [checkAndHandleInactivity]);
+
+  // Check for inactivity when page becomes visible (e.g., after sleep)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Page became visible, check for inactivity
+        setTimeout(checkAndHandleInactivity, 1000); // Small delay to ensure state is loaded
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [checkAndHandleInactivity]);
+
+  // Check for inactivity when window gains focus (e.g., switching back to tab)
+  useEffect(() => {
+    const handleFocus = () => {
+      setTimeout(checkAndHandleInactivity, 1000); // Small delay to ensure state is loaded
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [checkAndHandleInactivity]);
+
+  // Enhanced before unload handling - save current state when leaving
   useEffect(() => {
     const activeTask = tasks.find(t => t.status === 'WORKING');
     if (!activeTask) return;
 
-    // Handle page unload (closing tab, refreshing, Mac sleep)
     const handleBeforeUnload = () => {
       if (activeTask && activeTask.status === 'WORKING') {
         // Save current state before unload
         localStorage.setItem('kanban-paused-task', JSON.stringify({
           taskId: activeTask.id,
-          pausedAt: new Date().toISOString()
+          pausedAt: new Date().toISOString(),
+          lastActive: Date.now()
         }));
       }
     };
@@ -655,15 +941,23 @@ export function KanbanBoard() {
       const pausedTaskData = localStorage.getItem('kanban-paused-task');
       if (pausedTaskData) {
         try {
-          const { taskId } = JSON.parse(pausedTaskData);
+          const { taskId, lastActive } = JSON.parse(pausedTaskData);
           const task = tasks.find(t => t.id === taskId);
           if (task && task.status === 'WORKING') {
-            // Task was paused due to page unload, show resume prompt
-            if (confirm(`Your task "${task.title}" was paused when you left the page. Would you like to resume it?`)) {
-              // Task is already in WORKING status, just continue
+            // Check if there was a significant gap
+            const now = Date.now();
+            const gap = now - lastActive;
+            if (gap > 120000) { // 2 minutes
+              // Auto-pause due to inactivity
+              checkAndHandleInactivity();
             } else {
-              // User chose not to resume, move to IN_PROGRESS
-              toggleTimer(taskId);
+              // Task was paused due to page unload, show resume prompt
+              if (confirm(`Your task "${task.title}" was paused when you left the page. Would you like to resume it?`)) {
+                // Task is already in WORKING status, just continue
+              } else {
+                // User chose not to resume, move to IN_PROGRESS
+                toggleTimer(taskId);
+              }
             }
           }
         } catch (error) {
@@ -683,7 +977,7 @@ export function KanbanBoard() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [tasks, toggleTimer]);
+  }, [tasks, toggleTimer, checkAndHandleInactivity]);
 
   const backlogCount = currentWorkspaceTasks.filter(t => t.status === 'NEW').length;
   const doneCount = currentWorkspaceTasks.filter(t => t.status === 'DONE').length;
@@ -692,39 +986,39 @@ export function KanbanBoard() {
     <div className="relative h-screen flex flex-col min-h-0 overflow-hidden bg-background">
       {/* Workspace/Board Title Selector (Top Left) */}
       {!showBacklog && !showDone && (
-        <div className="absolute left-8 top-6 z-50 flex items-center select-none" ref={dropdownRef}>
-          <button
-            className="flex items-center gap-2 text-base font-semibold text-foreground/70 bg-transparent border-none outline-none px-0 py-0 transition hover:underline hover:bg-muted/30 rounded-lg cursor-pointer"
-            style={{ boxShadow: 'none' }}
-            onClick={() => setDropdownOpen(v => !v)}
-          >
-            {workspaces.find(ws => ws.id === currentWorkspace)?.name}
-            <ChevronDown className={`w-4 h-4 text-muted-foreground opacity-70 transition ${dropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {dropdownOpen && (
-            <ol className="absolute left-0 top-full mt-2 bg-card shadow-lg rounded-lg py-2 min-w-[180px] border border-border animate-in fade-in z-50 list-none p-0">
-              {workspaces.map(ws => (
-                <li key={ws.id}>
-                  <button
-                    className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${currentWorkspace === ws.id ? 'bg-muted font-bold' : ''}`}
-                    onClick={() => { setCurrentWorkspace(ws.id); setDropdownOpen(false); }}
-                    type="button"
-                  >
-                    {ws.name}
-                  </button>
-                </li>
-              ))}
-              <li>
+      <div className="absolute left-8 top-6 z-50 flex items-center select-none" ref={dropdownRef}>
+        <button
+          className="flex items-center gap-2 text-base font-semibold text-foreground/70 bg-transparent border-none outline-none px-0 py-0 transition hover:underline hover:bg-muted/30 rounded-lg cursor-pointer"
+          style={{ boxShadow: 'none' }}
+          onClick={() => setDropdownOpen(v => !v)}
+        >
+          {workspaces.find(ws => ws.id === currentWorkspace)?.name}
+          <ChevronDown className={`w-4 h-4 text-muted-foreground opacity-70 transition ${dropdownOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {dropdownOpen && (
+          <ol className="absolute left-0 top-full mt-2 bg-card shadow-lg rounded-lg py-2 min-w-[180px] border border-border animate-in fade-in z-50 list-none p-0">
+            {workspaces.map(ws => (
+              <li key={ws.id}>
                 <button
-                  className="w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-primary/10 text-primary flex items-center gap-2"
-                  onClick={addNewBoard}
+                    className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${currentWorkspace === ws.id ? 'bg-muted font-bold' : ''}`}
+                  onClick={() => { setCurrentWorkspace(ws.id); setDropdownOpen(false); }}
+                  type="button"
                 >
-                  <Plus className="w-4 h-4" /> Add New Board
+                  {ws.name}
                 </button>
               </li>
-            </ol>
-          )}
-        </div>
+            ))}
+            <li>
+              <button
+                className="w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-primary/10 text-primary flex items-center gap-2"
+                  onClick={addNewBoard}
+              >
+                <Plus className="w-4 h-4" /> Add New Board
+              </button>
+            </li>
+          </ol>
+        )}
+      </div>
       )}
       {/* Subtle dark gradient background */}
       <div className="absolute inset-0 -z-10" style={{ background: 'var(--background)' }} />
@@ -732,7 +1026,7 @@ export function KanbanBoard() {
         <div className="fixed top-8 right-8 z-50 flex gap-4">
           <FloatingAnalyticsButton onClick={() => setAnalyticsOpen(true)} />
           <FloatingSettingsButton onClick={() => setSettingsOpen(true)} />
-          <ThemeToggleFloatingButton />
+      <ThemeToggleFloatingButton />
         </div>
       )}
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
@@ -1098,31 +1392,31 @@ export function KanbanBoard() {
       )}
       {/* Sticky Backlog Button */}
       {!showBacklog && (
-        <button
+      <button
           className="fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-card text-foreground border border-border rounded-r-xl shadow-lg px-4 py-4 flex items-center gap-3 hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 group"
-          onClick={() => setShowBacklog(v => !v)}
-          aria-label="Show Backlog"
-        >
+        onClick={() => setShowBacklog(v => !v)}
+        aria-label="Show Backlog"
+      >
           <ChevronLeft className={`h-5 w-5 transition-transform ${showBacklog ? 'rotate-180' : ''}`} />
           <div className="flex flex-col items-start">
             <span className="text-sm font-medium select-none">Backlog</span>
             <span className="text-xs text-muted-foreground group-hover:text-white/80">{backlogCount} items</span>
           </div>
-        </button>
+      </button>
       )}
       {/* Sticky Done Button */}
       {!showDone && (
-        <button
+      <button
           className="fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-card text-foreground border border-border rounded-l-xl shadow-lg px-4 py-4 flex items-center gap-3 hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 group"
-          onClick={() => setShowDone(v => !v)}
-          aria-label="Show Done"
-        >
+        onClick={() => setShowDone(v => !v)}
+        aria-label="Show Done"
+      >
           <div className="flex flex-col items-end">
             <span className="text-sm font-medium select-none">Done</span>
             <span className="text-xs text-muted-foreground group-hover:text-white/80">{doneCount} items</span>
           </div>
           <ChevronRight className={`h-5 w-5 transition-transform ${showDone ? 'rotate-180' : ''}`} />
-        </button>
+      </button>
       )}
       {/* Slide-in Backlog */}
       <div className={`fixed top-0 left-0 h-full z-30 transition-transform duration-300 ${showBacklog ? 'translate-x-0' : '-translate-x-full'}`} style={{width: 340}}>
@@ -1147,12 +1441,12 @@ export function KanbanBoard() {
                   <KanbanCard
                     key={task.id}
                     task={task}
-                    onDelete={deleteTask}
-                    onEdit={editTask}
-                    onMove={moveTask}
-                    onToggleTimer={toggleTimer}
+            onDelete={deleteTask}
+            onEdit={editTask}
+            onMove={moveTask}
+            onToggleTimer={toggleTimer}
                     onShowDetails={handleShowDetails}
-                  />
+          />
                 ))
               )}
             </div>
@@ -1186,12 +1480,12 @@ export function KanbanBoard() {
                   <KanbanCard
                     key={task.id}
                     task={task}
-                    onDelete={deleteTask}
-                    onEdit={editTask}
-                    onMove={moveTask}
-                    onToggleTimer={toggleTimer}
+            onDelete={deleteTask}
+            onEdit={editTask}
+            onMove={moveTask}
+            onToggleTimer={toggleTimer}
                     onShowDetails={handleShowDetails}
-                  />
+          />
                 ))
               )}
             </div>
@@ -1296,7 +1590,7 @@ export function KanbanBoard() {
       </div>
       {analyticsOpen === false && <FloatingAddButton onClick={() => addTask('NEW')} />}
       {/* Slide-in Task Details Panel */}
-      <TaskDetailsPanel task={detailsTask} onClose={handleCloseDetails} />
+      <TaskDetailsPanel task={detailsTask} onClose={handleCloseDetails} onUpdateTask={updateTask} />
     </div>
   );
 } 
