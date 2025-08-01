@@ -553,10 +553,50 @@ export function KanbanBoard() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
-      // Update last active timestamp
-      localStorage.setItem('kanban-last-active', Date.now().toString());
     }, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Track user activity more comprehensively
+  useEffect(() => {
+    const updateLastActive = () => {
+      localStorage.setItem('kanban-last-active', Date.now().toString());
+    };
+
+    // Update on various user activities
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    events.forEach(event => {
+      document.addEventListener(event, updateLastActive, { passive: true });
+    });
+
+    // Handle keyboard shortcuts that might cause system events
+    const handleKeyDown = (e: KeyboardEvent) => {
+      updateLastActive();
+      
+      // Detect Cmd+Ctrl+Q (macOS quit) and other system shortcuts
+      if ((e.metaKey || e.ctrlKey) && e.key === 'q') {
+        console.log('Detected Cmd+Ctrl+Q - updating last active time');
+        updateLastActive();
+      }
+    };
+
+    // Also update on focus and visibility change
+    window.addEventListener('focus', updateLastActive);
+    document.addEventListener('visibilitychange', updateLastActive);
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Initial update
+    updateLastActive();
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, updateLastActive);
+      });
+      window.removeEventListener('focus', updateLastActive);
+      document.removeEventListener('visibilitychange', updateLastActive);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
 
@@ -852,72 +892,108 @@ export function KanbanBoard() {
   const checkAndHandleInactivity = useCallback(() => {
     const lastActiveStr = localStorage.getItem('kanban-last-active');
     const now = Date.now();
-    if (lastActiveStr) {
-      const lastActive = parseInt(lastActiveStr, 10);
-      const gap = now - lastActive;
-      if (gap > 120000) { // 2 minutes
-        const activeTask = tasks.find(t => t.status === 'WORKING');
-        if (activeTask) {
-          // Only count time up to lastActive, not now
-          const startedAt = activeTask.startedAt ? new Date(activeTask.startedAt).getTime() : null;
-          let sessionTime = 0;
-          if (startedAt && lastActive > startedAt) {
-            sessionTime = lastActive - startedAt;
-          }
-          const totalWorkingTime = (activeTask.totalWorkingTime || 0) + sessionTime;
-          // Update history: close WORKING, add IN_PROGRESS
-          const newHistory = [...activeTask.history];
-          if (newHistory.length > 0 && newHistory[newHistory.length - 1].status === 'WORKING' && !newHistory[newHistory.length - 1].exitedAt) {
-            newHistory[newHistory.length - 1].exitedAt = new Date(lastActive).toISOString();
-          }
-          const existingInProgressEntry = newHistory.find(entry => entry.status === 'IN_PROGRESS' && !entry.exitedAt);
-          if (!existingInProgressEntry) {
-            newHistory.push({ status: 'IN_PROGRESS', enteredAt: new Date(lastActive).toISOString() });
-          }
-          // Update the task in state
-          setTasks(tasks => tasks.map(t =>
-            t.id === activeTask.id
-              ? {
-                  ...t,
-                  status: 'IN_PROGRESS',
-                  startedAt: undefined,
-                  totalWorkingTime,
-                  history: newHistory
-                }
-              : t
-          ));
-          alert('Your task was automatically paused because your computer was inactive or asleep. The time while your Mac was closed was not counted.');
+    
+    if (!lastActiveStr) return;
+    
+    const lastActive = parseInt(lastActiveStr, 10);
+    const gap = now - lastActive;
+    
+    // Check for significant inactivity (2 minutes or more)
+    if (gap > 120000) {
+      const activeTask = tasks.find(t => t.status === 'WORKING');
+      if (activeTask) {
+        // Calculate session time up to lastActive (not now)
+        const startedAt = activeTask.startedAt ? new Date(activeTask.startedAt).getTime() : null;
+        let sessionTime = 0;
+        
+        if (startedAt && lastActive > startedAt) {
+          sessionTime = lastActive - startedAt;
+        }
+        
+        const totalWorkingTime = (activeTask.totalWorkingTime || 0) + sessionTime;
+        
+        // Update history: close WORKING, add IN_PROGRESS
+        const newHistory = [...activeTask.history];
+        
+        // Close the current WORKING entry if it exists
+        if (newHistory.length > 0 && newHistory[newHistory.length - 1].status === 'WORKING' && !newHistory[newHistory.length - 1].exitedAt) {
+          newHistory[newHistory.length - 1].exitedAt = new Date(lastActive).toISOString();
+        }
+        
+        // Add IN_PROGRESS entry if none exists
+        const existingInProgressEntry = newHistory.find(entry => entry.status === 'IN_PROGRESS' && !entry.exitedAt);
+        if (!existingInProgressEntry) {
+          newHistory.push({ status: 'IN_PROGRESS', enteredAt: new Date(lastActive).toISOString() });
+        }
+        
+        // Update the task in state
+        setTasks(tasks => tasks.map(t =>
+          t.id === activeTask.id
+            ? {
+                ...t,
+                status: 'IN_PROGRESS',
+                startedAt: undefined,
+                totalWorkingTime,
+                history: newHistory
+              }
+            : t
+        ));
+        
+        // Show notification
+        console.log(`Task "${activeTask.title}" auto-paused due to ${Math.round(gap / 60000)} minutes of inactivity`);
+        
+        // Use a more user-friendly notification instead of alert
+        if (gap > 300000) { // Only show alert for 5+ minutes of inactivity
+          alert(`Your task "${activeTask.title}" was automatically paused because your computer was inactive or asleep for ${Math.round(gap / 60000)} minutes. The time while your Mac was closed was not counted.`);
         }
       }
     }
   }, [tasks]);
 
-  // Check for inactivity on mount
+  // Check for inactivity on mount and when page becomes visible
   useEffect(() => {
-    checkAndHandleInactivity();
-  }, [checkAndHandleInactivity]);
+    let timeoutId: NodeJS.Timeout;
+    
+    const handleInactivityCheck = () => {
+      // Clear any existing timeout to prevent multiple checks
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      // Add a small delay to ensure state is loaded and prevent race conditions
+      timeoutId = setTimeout(() => {
+        checkAndHandleInactivity();
+      }, 500);
+    };
 
-  // Check for inactivity when page becomes visible (e.g., after sleep)
-  useEffect(() => {
+    // Check on mount
+    handleInactivityCheck();
+
+    // Check when page becomes visible (e.g., after sleep)
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        // Page became visible, check for inactivity
-        setTimeout(checkAndHandleInactivity, 1000); // Small delay to ensure state is loaded
+        handleInactivityCheck();
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [checkAndHandleInactivity]);
-
-  // Check for inactivity when window gains focus (e.g., switching back to tab)
-  useEffect(() => {
+    // Check when window gains focus (e.g., switching back to tab)
     const handleFocus = () => {
-      setTimeout(checkAndHandleInactivity, 1000); // Small delay to ensure state is loaded
+      handleInactivityCheck();
     };
 
+    // Check when user returns from lock screen or other system events
+    const handleResume = () => {
+      handleInactivityCheck();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    window.addEventListener('resume', handleResume);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('resume', handleResume);
+    };
   }, [checkAndHandleInactivity]);
 
   // Enhanced before unload handling - save current state when leaving
@@ -947,17 +1023,23 @@ export function KanbanBoard() {
             // Check if there was a significant gap
             const now = Date.now();
             const gap = now - lastActive;
+            
             if (gap > 120000) { // 2 minutes
               // Auto-pause due to inactivity
+              console.log(`Auto-pausing task due to ${Math.round(gap / 60000)} minute gap`);
               checkAndHandleInactivity();
             } else {
               // Task was paused due to page unload, show resume prompt
-              if (confirm(`Your task "${task.title}" was paused when you left the page. Would you like to resume it?`)) {
-                // Task is already in WORKING status, just continue
-              } else {
-                // User chose not to resume, move to IN_PROGRESS
-                toggleTimer(taskId);
-              }
+              setTimeout(() => {
+                if (confirm(`Your task "${task.title}" was paused when you left the page. Would you like to resume it?`)) {
+                  // Task is already in WORKING status, just continue
+                  console.log('User chose to resume task');
+                } else {
+                  // User chose not to resume, move to IN_PROGRESS
+                  console.log('User chose not to resume task');
+                  toggleTimer(taskId);
+                }
+              }, 1000); // Small delay to ensure UI is ready
             }
           }
         } catch (error) {
@@ -970,8 +1052,8 @@ export function KanbanBoard() {
     // Set up event listeners
     window.addEventListener('beforeunload', handleBeforeUnload);
     
-    // Check for paused task on mount
-    checkPausedTask();
+    // Check for paused task on mount with delay
+    setTimeout(checkPausedTask, 2000);
 
     // Cleanup event listeners
     return () => {
