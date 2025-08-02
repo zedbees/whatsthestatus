@@ -13,6 +13,7 @@ import { FloatingAnalyticsButton } from './FloatingAnalyticsButton';
 import { AnalyticsModal } from './AnalyticsModal';
 import CreatableSelect from 'react-select/creatable';
 import { Edit2, Trash2, Play, Pause, ArrowRight, Clock, Calendar as CalendarIcon, Clock as ClockIcon } from 'lucide-react';
+import { settingsStore, Settings } from '../stores/settings';
 
 interface Workspace {
   id: string;
@@ -109,7 +110,13 @@ function formatShortDate(date: string) {
 }
 
 // Placeholder for TaskDetailsPanel
-function TaskDetailsPanel({ task, onClose, onUpdateTask, availableTaskTypes }: { task: Task | null, onClose: () => void, onUpdateTask?: (taskId: string, updates: Partial<Task>) => void, availableTaskTypes: string[] }) {
+function TaskDetailsPanel({ task, onClose, onUpdateTask, onUpdateTaskTime, availableTaskTypes }: { 
+  task: Task | null, 
+  onClose: () => void, 
+  onUpdateTask?: (taskId: string, updates: Partial<Task>) => void, 
+  onUpdateTaskTime?: (taskId: string, newTotalWorkingTime: number) => void,
+  availableTaskTypes: string[] 
+}) {
   const [elapsed, setElapsed] = useState(0);
   const [editingTags, setEditingTags] = useState<string[]>(task?.tags || []);
   const [newTag, setNewTag] = useState('');
@@ -118,9 +125,12 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask, availableTaskTypes }: {
   const [titleValue, setTitleValue] = useState(task?.title || '');
   const [descriptionValue, setDescriptionValue] = useState(task?.description || '');
   const [detailsTaskTypeDropdownOpen, setDetailsTaskTypeDropdownOpen] = useState(false);
+  const [editingTime, setEditingTime] = useState(false);
+  const [timeValue, setTimeValue] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  const timeInputRef = useRef<HTMLInputElement>(null);
   
   // Calculate task age
   const getTaskAge = (createdAt: string) => {
@@ -250,6 +260,39 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask, availableTaskTypes }: {
     if (e.key === 'Escape') {
       e.preventDefault();
       cancelDescriptionEdit();
+    }
+  };
+
+  // Time editing functions
+  const startEditingTime = () => {
+    setEditingTime(true);
+    const currentTime = task?.totalWorkingTime || 0;
+    const hours = Math.floor(currentTime / (1000 * 60 * 60));
+    const minutes = Math.floor((currentTime % (1000 * 60 * 60)) / (1000 * 60));
+    setTimeValue(`${hours}:${minutes.toString().padStart(2, '0')}`);
+    setTimeout(() => timeInputRef.current?.focus(), 0);
+  };
+
+  const saveTime = () => {
+    if (task && onUpdateTaskTime) {
+      const [hours, minutes] = timeValue.split(':').map(Number);
+      const newTotalWorkingTime = ((hours || 0) * 60 * 60 + (minutes || 0) * 60) * 1000;
+      onUpdateTaskTime(task.id, newTotalWorkingTime);
+    }
+    setEditingTime(false);
+  };
+
+  const cancelTimeEdit = () => {
+    setEditingTime(false);
+  };
+
+  const handleTimeKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveTime();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelTimeEdit();
     }
   };
   
@@ -528,6 +571,13 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask, availableTaskTypes }: {
                     {workingPercentage}% of total time
                   </span>
                 )}
+                <button
+                  onClick={startEditingTime}
+                  className="ml-2 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 transition-colors"
+                  title="Edit time"
+                >
+                  ✏️
+                </button>
               </div>
             )}
             {task.status === 'WORKING' && (
@@ -536,6 +586,40 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask, availableTaskTypes }: {
               </span>
             )}
           </div>
+
+          {/* Time editing input */}
+          {editingTime && (
+            <div className="mb-4 p-3 bg-muted/20 rounded-lg border border-border">
+              <div className="text-sm font-medium text-foreground mb-2">Edit Total Working Time</div>
+              <div className="flex gap-2 items-center">
+                <input
+                  ref={timeInputRef}
+                  type="text"
+                  value={timeValue}
+                  onChange={(e) => setTimeValue(e.target.value)}
+                  onKeyDown={handleTimeKeyDown}
+                  onBlur={saveTime}
+                  placeholder="0:30"
+                  className="flex-1 px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                />
+                <button
+                  onClick={saveTime}
+                  className="px-3 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={cancelTimeEdit}
+                  className="px-3 py-2 bg-muted text-foreground rounded-md hover:bg-muted/80 transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Format: hours:minutes (e.g., 1:30 for 1 hour 30 minutes)
+              </div>
+            </div>
+          )}
           {/* Completion info */}
           {task.status === 'DONE' && (
             <div className="flex items-center gap-3 mb-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -602,6 +686,7 @@ export function KanbanBoard() {
       return task;
     });
   });
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addBoardModalOpen, setAddBoardModalOpen] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
@@ -625,6 +710,27 @@ export function KanbanBoard() {
   const handleShowDetails = useCallback((id: string) => setDetailsTaskId(id), []);
   const handleCloseDetails = useCallback(() => setDetailsTaskId(null), []);
 
+  // Load settings on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const currentSettings = await settingsStore.getSettings();
+        setSettings(currentSettings);
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+        // Fallback to default settings
+        setSettings({
+          autoStartDay: true,
+          endOfDayTime: 16,
+          autoPauseAfterMinutes: 30,
+          showCompletedTasks: true,
+          theme: 'system'
+        });
+      }
+    };
+    loadSettings();
+  }, []);
+
   // Update current time every second for live timer
   useEffect(() => {
     const interval = setInterval(() => {
@@ -646,37 +752,76 @@ export function KanbanBoard() {
       document.addEventListener(event, updateLastActive, { passive: true });
     });
 
+    // Also communicate with background script for better detection
+    const updateBackgroundScript = () => {
+      if (chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({ type: 'UPDATE_LAST_ACTIVE' }).catch(() => {
+          // Background script might not be available, ignore error
+        });
+      }
+    };
+
+    // Enhanced activity tracking that also updates background script
+    const enhancedUpdateLastActive = () => {
+      updateLastActive();
+      updateBackgroundScript();
+    };
+
     // Handle keyboard shortcuts that might cause system events
     const handleKeyDown = (e: KeyboardEvent) => {
-      updateLastActive();
+      enhancedUpdateLastActive();
       
       // Detect Cmd+Ctrl+Q (macOS quit) and other system shortcuts
       if ((e.metaKey || e.ctrlKey) && e.key === 'q') {
         console.log('Detected Cmd+Ctrl+Q - updating last active time');
-        updateLastActive();
+        enhancedUpdateLastActive();
       }
     };
 
+    // Enhanced system-level detection
+    const handleSystemEvents = () => {
+      enhancedUpdateLastActive();
+      console.log('System event detected - updating last active time');
+    };
+
     // Also update on focus and visibility change
-    window.addEventListener('focus', updateLastActive);
-    document.addEventListener('visibilitychange', updateLastActive);
+    window.addEventListener('focus', enhancedUpdateLastActive);
+    window.addEventListener('blur', enhancedUpdateLastActive);
+    document.addEventListener('visibilitychange', enhancedUpdateLastActive);
     document.addEventListener('keydown', handleKeyDown);
 
+    // Additional system-level events for better MacBook detection
+    window.addEventListener('online', handleSystemEvents);
+    window.addEventListener('offline', handleSystemEvents);
+    window.addEventListener('resize', handleSystemEvents);
+    window.addEventListener('orientationchange', handleSystemEvents);
+    
+    // Try to detect sleep/wake cycles
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock?.request('screen').then(() => {
+        console.log('Wake lock acquired');
+      }).catch(err => {
+        console.log('Wake lock failed:', err);
+      });
+    }
+
     // Initial update
-    updateLastActive();
+    enhancedUpdateLastActive();
 
     return () => {
       events.forEach(event => {
         document.removeEventListener(event, updateLastActive);
       });
-      window.removeEventListener('focus', updateLastActive);
-      document.removeEventListener('visibilitychange', updateLastActive);
+      window.removeEventListener('focus', enhancedUpdateLastActive);
+      window.removeEventListener('blur', enhancedUpdateLastActive);
+      document.removeEventListener('visibilitychange', enhancedUpdateLastActive);
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('online', handleSystemEvents);
+      window.removeEventListener('offline', handleSystemEvents);
+      window.removeEventListener('resize', handleSystemEvents);
+      window.removeEventListener('orientationchange', handleSystemEvents);
     };
   }, []);
-
-
-
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -1007,8 +1152,24 @@ export function KanbanBoard() {
     ));
   };
 
+  // Manual time editing function (for paid users later)
+  const updateTaskTime = (taskId: string, newTotalWorkingTime: number) => {
+    setTasks(tasks => tasks.map(t => {
+      if (t.id !== taskId) return t;
+      
+      // Update the total working time
+      return {
+        ...t,
+        totalWorkingTime: newTotalWorkingTime,
+        updatedAt: new Date().toISOString()
+      };
+    }));
+  };
+
   // Comprehensive inactivity detection - runs on mount, visibility change, and storage changes
   const checkAndHandleInactivity = useCallback(() => {
+    if (!settings) return; // Wait for settings to load
+    
     const lastActiveStr = localStorage.getItem('kanban-last-active');
     const now = Date.now();
     
@@ -1017,8 +1178,11 @@ export function KanbanBoard() {
     const lastActive = parseInt(lastActiveStr, 10);
     const gap = now - lastActive;
     
-    // Check for significant inactivity (2 minutes or more)
-    if (gap > 120000) {
+    // Use settings value instead of hardcoded 2 minutes
+    const autoPauseThreshold = settings.autoPauseAfterMinutes * 60 * 1000; // Convert to milliseconds
+    
+    // Check for significant inactivity based on user settings
+    if (gap > autoPauseThreshold) {
       const activeTask = tasks.find(t => t.status === 'WORKING');
       if (activeTask) {
         // Calculate session time up to lastActive (not now)
@@ -1058,8 +1222,8 @@ export function KanbanBoard() {
             : t
         ));
         
-        // Show notification
-        console.log(`Task "${activeTask.title}" auto-paused due to ${Math.round(gap / 60000)} minutes of inactivity`);
+        // Show notification with settings-based threshold
+        console.log(`Task "${activeTask.title}" auto-paused due to ${Math.round(gap / 60000)} minutes of inactivity (threshold: ${settings.autoPauseAfterMinutes} minutes)`);
         
         // Use a more user-friendly notification instead of alert
         if (gap > 300000) { // Only show alert for 5+ minutes of inactivity
@@ -1067,7 +1231,7 @@ export function KanbanBoard() {
         }
       }
     }
-  }, [tasks]);
+  }, [tasks, settings]);
 
   // Check for inactivity on mount and when page becomes visible
   useEffect(() => {
@@ -1143,9 +1307,12 @@ export function KanbanBoard() {
             const now = Date.now();
             const gap = now - lastActive;
             
-            if (gap > 120000) { // 2 minutes
+            // Use settings value instead of hardcoded 2 minutes
+            const autoPauseThreshold = settings?.autoPauseAfterMinutes ? settings.autoPauseAfterMinutes * 60 * 1000 : 120000;
+            
+            if (gap > autoPauseThreshold) {
               // Auto-pause due to inactivity
-              console.log(`Auto-pausing task due to ${Math.round(gap / 60000)} minute gap`);
+              console.log(`Auto-pausing task due to ${Math.round(gap / 60000)} minute gap (threshold: ${settings?.autoPauseAfterMinutes || 2} minutes)`);
               checkAndHandleInactivity();
             } else {
               // Task was paused due to page unload, show resume prompt
@@ -1777,7 +1944,13 @@ export function KanbanBoard() {
       </div>
       {analyticsOpen === false && <FloatingAddButton onClick={() => addTask('NEW')} />}
       {/* Slide-in Task Details Panel */}
-      <TaskDetailsPanel task={detailsTask} onClose={handleCloseDetails} onUpdateTask={updateTask} availableTaskTypes={availableTaskTypes} />
+      <TaskDetailsPanel 
+        task={detailsTask} 
+        onClose={handleCloseDetails} 
+        onUpdateTask={updateTask} 
+        onUpdateTaskTime={updateTaskTime}
+        availableTaskTypes={availableTaskTypes} 
+      />
     </div>
   );
 } 

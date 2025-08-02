@@ -5,7 +5,7 @@
     "dev": "vite",
     "build": "tsc && vite build && npm run copy-files",
     "preview": "vite preview",
-    "copy-files": "cp manifest.json dist/ && mkdir -p dist/icons && cp -r public/icons/* dist/icons/"
+    "copy-files": "cp manifest.json dist/ && cp background.js dist/ && mkdir -p dist/icons && cp -r public/icons/* dist/icons/"
   },
   "dependencies": {
     "@pathofdev/react-tag-input": "^1.0.7",
