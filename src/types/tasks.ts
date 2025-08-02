@@ -11,6 +11,7 @@ export interface Task {
   title: string;
   description?: string; // Optional description for the task
   tags?: string[]; // Free-form tags for the task
+  taskType?: string; // Type of the task (e.g., "Bug", "Feature", "Task", etc.)
   status: TaskStatus;
   workspaceId: string; // which workspace/board this task belongs to
   createdAt: string;

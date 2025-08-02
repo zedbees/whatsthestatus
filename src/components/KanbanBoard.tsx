@@ -17,6 +17,7 @@ import { Edit2, Trash2, Play, Pause, ArrowRight, Clock, Calendar as CalendarIcon
 interface Workspace {
   id: string;
   name: string;
+  taskTypes?: string[]; // Available task types for this workspace
 }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -108,7 +109,7 @@ function formatShortDate(date: string) {
 }
 
 // Placeholder for TaskDetailsPanel
-function TaskDetailsPanel({ task, onClose, onUpdateTask }: { task: Task | null, onClose: () => void, onUpdateTask?: (taskId: string, updates: Partial<Task>) => void }) {
+function TaskDetailsPanel({ task, onClose, onUpdateTask, availableTaskTypes }: { task: Task | null, onClose: () => void, onUpdateTask?: (taskId: string, updates: Partial<Task>) => void, availableTaskTypes: string[] }) {
   const [elapsed, setElapsed] = useState(0);
   const [editingTags, setEditingTags] = useState<string[]>(task?.tags || []);
   const [newTag, setNewTag] = useState('');
@@ -116,6 +117,7 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask }: { task: Task | null, 
   const [editingDescription, setEditingDescription] = useState(false);
   const [titleValue, setTitleValue] = useState(task?.title || '');
   const [descriptionValue, setDescriptionValue] = useState(task?.description || '');
+  const [detailsTaskTypeDropdownOpen, setDetailsTaskTypeDropdownOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
@@ -263,15 +265,34 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask }: { task: Task | null, 
       return () => clearInterval(interval);
     }
   }, [task]);
-  // Close on Escape key
+  // Close on Escape key and handle dropdown clicks
   useEffect(() => {
     if (!task) return;
+    
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (detailsTaskTypeDropdownOpen) {
+          setDetailsTaskTypeDropdownOpen(false);
+        } else {
+          onClose();
+        }
+      }
     };
+
+    const handleClickOutside = () => {
+      if (detailsTaskTypeDropdownOpen) {
+        setDetailsTaskTypeDropdownOpen(false);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [task, onClose]);
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [task, onClose, detailsTaskTypeDropdownOpen]);
   // Prevent click inside panel from closing
   const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
   if (!task) return (
@@ -402,6 +423,58 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask }: { task: Task | null, 
                 {task.description ? task.description : <span className="text-muted-foreground">No description</span>}
               </div>
             )}
+          </div>
+          {/* Task Type */}
+          <div className="mb-6">
+            <div className="text-sm font-semibold text-muted-foreground mb-2">Task Type</div>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setDetailsTaskTypeDropdownOpen(v => !v)}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm text-left flex items-center justify-between"
+              >
+                <span className={task.taskType ? 'text-foreground' : 'text-muted-foreground'}>
+                  {task.taskType || 'No type'}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition ${detailsTaskTypeDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {detailsTaskTypeDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-card shadow-lg rounded-lg py-2 border border-border animate-in fade-in z-50 max-h-48 overflow-y-auto">
+                  <button
+                    className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${!task.taskType ? 'bg-muted font-bold' : ''}`}
+                    onClick={() => {
+                      if (task && onUpdateTask) {
+                        onUpdateTask(task.id, {
+                          taskType: undefined,
+                          updatedAt: new Date().toISOString()
+                        });
+                      }
+                      setDetailsTaskTypeDropdownOpen(false);
+                    }}
+                  >
+                    No type
+                  </button>
+                  {availableTaskTypes.map(type => (
+                    <button
+                      key={type}
+                      className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${task.taskType === type ? 'bg-muted font-bold' : ''}`}
+                      onClick={() => {
+                        if (task && onUpdateTask) {
+                          onUpdateTask(task.id, {
+                            taskType: type,
+                            updatedAt: new Date().toISOString()
+                          });
+                        }
+                        setDetailsTaskTypeDropdownOpen(false);
+                      }}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           {/* Tags */}
           <div className="mb-6">
@@ -536,6 +609,9 @@ export function KanbanBoard() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskStatus, setNewTaskStatus] = useState<TaskStatus>('NEW');
   const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskType, setNewTaskType] = useState<string>('');
+  const [newTaskTypeName, setNewTaskTypeName] = useState('');
+  const [taskTypeDropdownOpen, setTaskTypeDropdownOpen] = useState(false);
   // For react-select, tags are objects with label/value, but we store as string[]
   const [newTaskTags, setNewTaskTags] = useState<string[]>([]);
   const [showBacklog, setShowBacklog] = useState(false);
@@ -608,14 +684,18 @@ export function KanbanBoard() {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
       }
+      // Close task type dropdown when clicking outside
+      if (taskTypeDropdownOpen) {
+        setTaskTypeDropdownOpen(false);
+      }
     }
-    if (dropdownOpen) {
+    if (dropdownOpen || taskTypeDropdownOpen) {
       document.addEventListener('mousedown', handleClick);
     } else {
       document.removeEventListener('mousedown', handleClick);
     }
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [dropdownOpen]);
+  }, [dropdownOpen, taskTypeDropdownOpen]);
 
   // Find the active task (WORKING)
   const activeTask = tasks.find(t => t.status === 'WORKING');
@@ -633,7 +713,11 @@ export function KanbanBoard() {
   // Demo workspaces/boards - load from localStorage
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
     const saved = localStorage.getItem('kanban-workspaces');
-    return saved ? JSON.parse(saved) : [{ id: 'default', name: 'Personal' }];
+    return saved ? JSON.parse(saved) : [{ 
+      id: 'default', 
+      name: 'Personal',
+      taskTypes: ['Task', 'Bug', 'Feature', 'Improvement']
+    }];
   });
   const [currentWorkspace, setCurrentWorkspace] = useState(() => {
     const saved = localStorage.getItem('kanban-current-workspace');
@@ -664,7 +748,8 @@ export function KanbanBoard() {
     
     const newBoard = {
       id: crypto.randomUUID(),
-      name: newBoardName.trim()
+      name: newBoardName.trim(),
+      taskTypes: ['Task', 'Bug', 'Feature', 'Improvement'] // Default task types for new boards
     };
     
     setWorkspaces([...workspaces, newBoard]);
@@ -681,6 +766,8 @@ export function KanbanBoard() {
 
   const addTask = (status: TaskStatus) => {
     setNewTaskStatus(status);
+    setNewTaskType(''); // Reset task type when opening modal
+    setTaskTypeDropdownOpen(false); // Reset dropdown state
     setAddTaskModalOpen(true);
   };
 
@@ -695,6 +782,7 @@ export function KanbanBoard() {
       title: newTaskTitle.trim(),
       description: newTaskDescription.trim() || undefined,
       tags: newTaskTags,
+      taskType: newTaskType.trim() || undefined,
       status: newTaskStatus,
       workspaceId: currentWorkspace,
         createdAt: new Date().toISOString(),
@@ -707,6 +795,7 @@ export function KanbanBoard() {
     setTasks([...tasks, newTask]);
     setNewTaskTitle('');
     setNewTaskDescription('');
+    setNewTaskType('');
     setNewTaskTags([]);
     setAddTaskModalOpen(false);
   };
@@ -714,8 +803,38 @@ export function KanbanBoard() {
   const handleCancelCreateTask = () => {
     setNewTaskTitle('');
     setNewTaskDescription('');
+    setNewTaskType('');
+    setNewTaskTypeName('');
+    setTaskTypeDropdownOpen(false);
     setNewTaskTags([]);
     setAddTaskModalOpen(false);
+  };
+
+  // Function to add new task type to current workspace
+  const addNewTaskType = (newType: string) => {
+    if (!newType.trim()) return;
+    
+    setWorkspaces(workspaces => workspaces.map(ws => {
+      if (ws.id === currentWorkspace) {
+        const existingTypes = ws.taskTypes || [];
+        if (!existingTypes.includes(newType.trim())) {
+          return {
+            ...ws,
+            taskTypes: [...existingTypes, newType.trim()]
+          };
+        }
+      }
+      return ws;
+    }));
+    
+    setNewTaskType(newType.trim());
+  };
+
+  const handleCreateTaskType = () => {
+    if (!newTaskTypeName.trim()) return;
+    
+    addNewTaskType(newTaskTypeName.trim());
+    setNewTaskTypeName('');
   };
 
 
@@ -1063,6 +1182,8 @@ export function KanbanBoard() {
 
   const backlogCount = currentWorkspaceTasks.filter(t => t.status === 'NEW').length;
   const doneCount = currentWorkspaceTasks.filter(t => t.status === 'DONE').length;
+  const currentWorkspaceData = workspaces.find(ws => ws.id === currentWorkspace);
+  const availableTaskTypes = currentWorkspaceData?.taskTypes || [];
 
   return (
     <div className="relative h-screen flex flex-col min-h-0 overflow-hidden bg-background">
@@ -1222,6 +1343,97 @@ export function KanbanBoard() {
                   placeholder="Add more details about this task..."
                   className="w-full px-4 py-3 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 text-base min-h-[80px]"
                 />
+              </div>
+              <div>
+                <label htmlFor="taskType" className="block text-sm font-medium text-foreground mb-3">
+                  Task Type (optional)
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setTaskTypeDropdownOpen(v => !v)}
+                    className="w-full px-4 py-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 text-base text-left flex items-center justify-between"
+                  >
+                    <span className={newTaskType ? 'text-foreground' : 'text-muted-foreground'}>
+                      {newTaskType || 'Select a task type...'}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition ${taskTypeDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {taskTypeDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-card shadow-lg rounded-lg py-2 border border-border animate-in fade-in z-50 max-h-48 overflow-y-auto">
+                      <button
+                        className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${!newTaskType ? 'bg-muted font-bold' : ''}`}
+                        onClick={() => {
+                          setNewTaskType('');
+                          setTaskTypeDropdownOpen(false);
+                        }}
+                      >
+                        No type
+                      </button>
+                      {availableTaskTypes.map(type => (
+                        <button
+                          key={type}
+                          className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${newTaskType === type ? 'bg-muted font-bold' : ''}`}
+                          onClick={() => {
+                            setNewTaskType(type);
+                            setTaskTypeDropdownOpen(false);
+                          }}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                      <button
+                        className="w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-primary/10 text-primary flex items-center gap-2"
+                        onClick={() => {
+                          setNewTaskType('__add_new__');
+                          setTaskTypeDropdownOpen(false);
+                        }}
+                      >
+                        <Plus className="w-4 h-4" /> Add New Type
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {newTaskType === '__add_new__' && (
+                  <div className="mt-3 p-3 bg-muted/20 rounded-lg border border-border">
+                    <input
+                      type="text"
+                      placeholder="Enter new task type name..."
+                      value={newTaskTypeName}
+                      onChange={(e) => setNewTaskTypeName(e.target.value)}
+                      className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleCreateTaskType();
+                        } else if (e.key === 'Escape') {
+                          setNewTaskType('');
+                          setNewTaskTypeName('');
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={handleCreateTaskType}
+                        disabled={!newTaskTypeName.trim()}
+                        className="px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Add Type
+                      </button>
+                      <button
+                        onClick={() => {
+                          setNewTaskType('');
+                          setNewTaskTypeName('');
+                        }}
+                        className="px-3 py-1 text-sm bg-muted text-foreground rounded-md hover:bg-muted/80 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label htmlFor="taskTags" className="block text-sm font-medium text-foreground mb-3">
@@ -1565,7 +1777,7 @@ export function KanbanBoard() {
       </div>
       {analyticsOpen === false && <FloatingAddButton onClick={() => addTask('NEW')} />}
       {/* Slide-in Task Details Panel */}
-      <TaskDetailsPanel task={detailsTask} onClose={handleCloseDetails} onUpdateTask={updateTask} />
+      <TaskDetailsPanel task={detailsTask} onClose={handleCloseDetails} onUpdateTask={updateTask} availableTaskTypes={availableTaskTypes} />
     </div>
   );
 } 

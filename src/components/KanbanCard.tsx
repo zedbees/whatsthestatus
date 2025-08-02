@@ -123,6 +123,14 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer, onSh
         >
           {task.title}
         </div>
+        {/* Task Type */}
+        {task.taskType && (
+          <div className="mb-2">
+            <span className="inline-block px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium rounded border border-blue-200 dark:border-blue-800">
+              {task.taskType}
+            </span>
+          </div>
+        )}
         {/* Tags (up to 2, +N if more) */}
         {task.tags && task.tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2 mt-1">
