@@ -826,14 +826,23 @@ export function KanbanBoard() {
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      
+      // Handle workspace dropdown
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setDropdownOpen(false);
       }
-      // Close task type dropdown when clicking outside
+      
+      // Handle task type dropdown - only close if click is outside the dropdown container
       if (taskTypeDropdownOpen) {
-        setTaskTypeDropdownOpen(false);
+        // Check if the click is inside the task type dropdown area
+        const taskTypeDropdown = document.querySelector('[data-task-type-dropdown]');
+        if (taskTypeDropdown && !taskTypeDropdown.contains(target)) {
+          setTaskTypeDropdownOpen(false);
+        }
       }
     }
+    
     if (dropdownOpen || taskTypeDropdownOpen) {
       document.addEventListener('mousedown', handleClick);
     } else {
@@ -1515,7 +1524,7 @@ export function KanbanBoard() {
                 <label htmlFor="taskType" className="block text-sm font-medium text-foreground mb-3">
                   Task Type (optional)
                 </label>
-                <div className="relative">
+                <div className="relative" data-task-type-dropdown>
                   <button
                     type="button"
                     onClick={() => setTaskTypeDropdownOpen(v => !v)}
@@ -1531,7 +1540,8 @@ export function KanbanBoard() {
                     <div className="absolute left-0 right-0 top-full mt-1 bg-card shadow-lg rounded-lg py-2 border border-border animate-in fade-in z-50 max-h-48 overflow-y-auto">
                       <button
                         className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${!newTaskType ? 'bg-muted font-bold' : ''}`}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setNewTaskType('');
                           setTaskTypeDropdownOpen(false);
                         }}
@@ -1542,7 +1552,8 @@ export function KanbanBoard() {
                         <button
                           key={type}
                           className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${newTaskType === type ? 'bg-muted font-bold' : ''}`}
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setNewTaskType(type);
                             setTaskTypeDropdownOpen(false);
                           }}
@@ -1552,7 +1563,8 @@ export function KanbanBoard() {
                       ))}
                       <button
                         className="w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-primary/10 text-primary flex items-center gap-2"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setNewTaskType('__add_new__');
                           setTaskTypeDropdownOpen(false);
                         }}

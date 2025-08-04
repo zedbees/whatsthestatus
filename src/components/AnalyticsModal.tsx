@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { BarChart as ReBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend } from 'recharts';
+import { BarChart as ReBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid } from 'recharts';
 import { Task } from '../types/tasks';
 
 interface Workspace {
@@ -103,6 +103,13 @@ export function AnalyticsModal({ open, onClose, tasks, workspaces }: AnalyticsMo
     weeks.push(calendarData.slice(i, i + 7));
   }
 
+  // Prepare line chart data for the last 30 days
+  const lineChartData = calendarData.slice(-30).map(day => ({
+    date: new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    hours: day.hours,
+    fullDate: day.date
+  }));
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="relative w-full h-full max-w-full max-h-full bg-background border border-border rounded-none shadow-xl flex flex-col">
@@ -179,6 +186,54 @@ export function AnalyticsModal({ open, onClose, tasks, workspaces }: AnalyticsMo
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">Avg per week:</span>
                 <span className="font-semibold text-foreground">{averageHoursPerWeek.toFixed(1)}h</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Daily Work Hours Trend Line Chart */}
+          <div className="w-full max-w-4xl bg-card rounded-xl p-6 shadow flex flex-col items-center">
+            <div className="text-lg font-semibold mb-4">Daily Work Hours Trend (Last 30 Days)</div>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={lineChartData} margin={{ left: 20, right: 20, top: 20, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fontSize: 12, fill: '#888' }}
+                  interval={0}
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis 
+                  tick={{ fontSize: 12, fill: '#888' }}
+                  label={{ value: 'Hours', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#888' } }}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [`${value.toFixed(1)} hours`, 'Work Hours']}
+                  labelFormatter={(label) => `Date: ${label}`}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="hours" 
+                  stroke="#10b981" 
+                  strokeWidth={3}
+                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+            <div className="flex items-center gap-8 mt-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Total hours (30 days):</span>
+                <span className="font-semibold text-foreground">{lineChartData.reduce((sum, day) => sum + day.hours, 0).toFixed(1)}h</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Daily average:</span>
+                <span className="font-semibold text-foreground">{(lineChartData.reduce((sum, day) => sum + day.hours, 0) / 30).toFixed(1)}h</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Active days:</span>
+                <span className="font-semibold text-foreground">{lineChartData.filter(day => day.hours > 0).length}</span>
               </div>
             </div>
           </div>
