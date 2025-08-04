@@ -109,6 +109,47 @@ function formatShortDate(date: string) {
   return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+function formatDeadline(deadline: string) {
+  const d = new Date(deadline);
+  const now = new Date();
+  
+  // Compare dates only (ignoring time) for day-level comparison
+  const deadlineDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.floor((deadlineDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  // Check if time is set (not midnight)
+  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+  
+  // For time-sensitive deadlines, check if the specific time has passed
+  const isTimePassed = hasTime && d.getTime() < now.getTime();
+  
+  if (diffDays < 0) {
+    // Past date - overdue
+    const text = `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''}`;
+    return { text, color: 'text-red-500 dark:text-red-400', hasTime };
+  } else if (diffDays === 0) {
+    // Same date
+    if (isTimePassed) {
+      const text = 'Overdue today';
+      return { text, color: 'text-red-500 dark:text-red-400', hasTime };
+    } else {
+      const text = hasTime ? 'Due today' : 'Due today (end of day)';
+      return { text, color: 'text-orange-500 dark:text-orange-400', hasTime };
+    }
+  } else if (diffDays === 1) {
+    const text = hasTime ? 'Due tomorrow' : 'Due tomorrow (end of day)';
+    return { text, color: 'text-yellow-500 dark:text-yellow-400', hasTime };
+  } else if (diffDays <= 7) {
+    const text = hasTime ? `Due in ${diffDays} days` : `Due in ${diffDays} days (end of day)`;
+    return { text, color: 'text-blue-500 dark:text-blue-400', hasTime };
+  } else {
+    const dateText = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const text = hasTime ? dateText : `${dateText} (end of day)`;
+    return { text, color: 'text-muted-foreground', hasTime };
+  }
+}
+
 // Placeholder for TaskDetailsPanel
 function TaskDetailsPanel({ task, onClose, onUpdateTask, onUpdateTaskTime, availableTaskTypes }: { 
   task: Task | null, 
@@ -127,10 +168,13 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask, onUpdateTaskTime, avail
   const [detailsTaskTypeDropdownOpen, setDetailsTaskTypeDropdownOpen] = useState(false);
   const [editingTime, setEditingTime] = useState(false);
   const [timeValue, setTimeValue] = useState('');
+  const [editingDeadline, setEditingDeadline] = useState(false);
+  const [deadlineValue, setDeadlineValue] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
   const timeInputRef = useRef<HTMLInputElement>(null);
+  const deadlineInputRef = useRef<HTMLInputElement>(null);
   
   // Calculate task age
   const getTaskAge = (createdAt: string) => {
@@ -295,6 +339,47 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask, onUpdateTaskTime, avail
       cancelTimeEdit();
     }
   };
+
+  // Deadline editing functions
+  const startEditingDeadline = () => {
+    setEditingDeadline(true);
+    if (task?.deadline) {
+      // Convert ISO string to datetime-local format
+      const deadlineDate = new Date(task.deadline);
+      const localDateTime = new Date(deadlineDate.getTime() - deadlineDate.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+      setDeadlineValue(localDateTime);
+    } else {
+      setDeadlineValue('');
+    }
+    setTimeout(() => deadlineInputRef.current?.focus(), 0);
+  };
+
+  const saveDeadline = () => {
+    if (task && onUpdateTask) {
+      const newDeadline = deadlineValue ? new Date(deadlineValue).toISOString() : undefined;
+      onUpdateTask(task.id, {
+        deadline: newDeadline,
+        updatedAt: new Date().toISOString()
+      });
+    }
+    setEditingDeadline(false);
+  };
+
+  const cancelDeadlineEdit = () => {
+    setEditingDeadline(false);
+  };
+
+  const handleDeadlineKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveDeadline();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelDeadlineEdit();
+    }
+  };
   
   // Timer for live elapsed time
   useEffect(() => {
@@ -437,6 +522,19 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask, onUpdateTaskTime, avail
           <div className="flex items-center gap-6 text-xs text-muted-foreground mb-2">
             <span className="flex items-center gap-1"><CalendarIcon className="w-4 h-4" />{formatShortDate(task.createdAt)}</span>
             <span className="flex items-center gap-1"><ClockIcon className="w-4 h-4" />{formatShortDate(task.updatedAt)}</span>
+            {task.deadline && (
+              <span className={`flex items-center gap-1 ${formatDeadline(task.deadline).color}`}>
+                <span className="text-red-500">⏰</span>
+                {formatDeadline(task.deadline).text}
+                <button
+                  onClick={startEditingDeadline}
+                  className="ml-1 hover:text-foreground transition-colors"
+                  title="Edit deadline"
+                >
+                  ✏️
+                </button>
+              </span>
+            )}
           </div>
           <hr className="my-2 border-border" />
           {/* Description */}
@@ -518,6 +616,38 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask, onUpdateTaskTime, avail
                 </div>
               )}
             </div>
+          </div>
+          {/* Deadline */}
+          <div className="mb-6">
+            <div className="text-sm font-semibold text-muted-foreground mb-2">Deadline</div>
+            {task.deadline ? (
+              <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-2 px-3 py-2 rounded border text-sm font-medium ${formatDeadline(task.deadline).color.includes('red') ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300' : formatDeadline(task.deadline).color.includes('orange') ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300' : formatDeadline(task.deadline).color.includes('yellow') ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-300' : formatDeadline(task.deadline).color.includes('blue') ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300' : 'bg-muted-foreground/10 border-border text-foreground'}`}>
+                  <span className="text-red-500">⏰</span>
+                  {formatDeadline(task.deadline).text}
+                </div>
+                <button
+                  onClick={startEditingDeadline}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Edit deadline"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="px-3 py-2 bg-muted/20 border border-border rounded text-sm text-muted-foreground">
+                  No deadline set
+                </div>
+                <button
+                  onClick={startEditingDeadline}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Add deadline"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
           {/* Tags */}
           <div className="mb-6">
@@ -620,6 +750,78 @@ function TaskDetailsPanel({ task, onClose, onUpdateTask, onUpdateTaskTime, avail
               </div>
             </div>
           )}
+
+          {/* Deadline editing input */}
+          {editingDeadline && (
+            <div className="mb-4 p-3 bg-muted/20 rounded-lg border border-border">
+              <div className="text-sm font-medium text-foreground mb-2">Edit Deadline</div>
+              <div className="space-y-3">
+                <div className="flex gap-2 items-center">
+                  <div className="relative flex-1">
+                    <input
+                      ref={deadlineInputRef}
+                      type="date"
+                      value={deadlineValue ? deadlineValue.split('T')[0] : ''}
+                      onChange={(e) => {
+                        const dateValue = e.target.value;
+                        if (dateValue) {
+                          // If there's already a time, preserve it
+                          const existingTime = deadlineValue ? deadlineValue.split('T')[1] : '';
+                          const newDateTime = existingTime ? `${dateValue}T${existingTime}` : `${dateValue}T00:00`;
+                          setDeadlineValue(newDateTime);
+                        } else {
+                          setDeadlineValue('');
+                        }
+                      }}
+                      onKeyDown={handleDeadlineKeyDown}
+                      onBlur={saveDeadline}
+                      className="w-full px-3 py-2 pr-10 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                    />
+                    {deadlineValue && (
+                      <button
+                        type="button"
+                        onClick={() => setDeadlineValue('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
+                        title="Clear deadline"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={saveDeadline}
+                    className="px-3 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={cancelDeadlineEdit}
+                    className="px-3 py-2 bg-muted text-foreground rounded-md hover:bg-muted/80 transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {deadlineValue && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      value={deadlineValue.split('T')[1] || '00:00'}
+                      onChange={(e) => {
+                        const timeValue = e.target.value;
+                        const dateValue = deadlineValue.split('T')[0];
+                        setDeadlineValue(`${dateValue}T${timeValue}`);
+                      }}
+                      className="px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                    />
+                    <span className="text-xs text-muted-foreground">Time (optional)</span>
+                  </div>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">
+                Leave empty to remove deadline
+              </div>
+            </div>
+          )}
           {/* Completion info */}
           {task.status === 'DONE' && (
             <div className="flex items-center gap-3 mb-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -699,6 +901,7 @@ export function KanbanBoard() {
   const [taskTypeDropdownOpen, setTaskTypeDropdownOpen] = useState(false);
   // For react-select, tags are objects with label/value, but we store as string[]
   const [newTaskTags, setNewTaskTags] = useState<string[]>([]);
+  const [newTaskDeadline, setNewTaskDeadline] = useState<string>('');
   const [showBacklog, setShowBacklog] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -921,6 +1124,7 @@ export function KanbanBoard() {
   const addTask = (status: TaskStatus) => {
     setNewTaskStatus(status);
     setNewTaskType(''); // Reset task type when opening modal
+    setNewTaskDeadline(''); // Reset deadline when opening modal
     setTaskTypeDropdownOpen(false); // Reset dropdown state
     setAddTaskModalOpen(true);
   };
@@ -937,6 +1141,7 @@ export function KanbanBoard() {
       description: newTaskDescription.trim() || undefined,
       tags: newTaskTags,
       taskType: newTaskType.trim() || undefined,
+      deadline: newTaskDeadline || undefined,
       status: newTaskStatus,
       workspaceId: currentWorkspace,
         createdAt: new Date().toISOString(),
@@ -959,6 +1164,7 @@ export function KanbanBoard() {
     setNewTaskDescription('');
     setNewTaskType('');
     setNewTaskTypeName('');
+    setNewTaskDeadline('');
     setTaskTypeDropdownOpen(false);
     setNewTaskTags([]);
     setAddTaskModalOpen(false);
@@ -1475,7 +1681,7 @@ export function KanbanBoard() {
       {/* Add Task Modal */}
       {addTaskModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-background border border-border rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-background border border-border rounded-lg p-6 w-full max-w-4xl mx-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-foreground">Add New Task</h2>
               <button
@@ -1487,6 +1693,7 @@ export function KanbanBoard() {
             </div>
             
             <div className="space-y-6">
+              {/* Task Title - Full Width */}
               <div>
                 <label htmlFor="taskTitle" className="block text-sm font-medium text-foreground mb-3">
                   Task Title
@@ -1508,6 +1715,287 @@ export function KanbanBoard() {
                   autoFocus
                 />
               </div>
+
+              {/* Two Column Layout */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Left Column */}
+                <div className="space-y-6">
+                  <div>
+                    <label htmlFor="taskType" className="block text-sm font-medium text-foreground mb-3">
+                      Task Type (optional)
+                    </label>
+                    <div className="relative" data-task-type-dropdown>
+                      <button
+                        type="button"
+                        onClick={() => setTaskTypeDropdownOpen(v => !v)}
+                        className="w-full px-4 py-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 text-base text-left flex items-center justify-between"
+                      >
+                        <span className={newTaskType ? 'text-foreground' : 'text-muted-foreground'}>
+                          {newTaskType || 'Select a task type...'}
+                        </span>
+                        <ChevronDown className={`w-4 h-4 text-muted-foreground transition ${taskTypeDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      
+                      {taskTypeDropdownOpen && (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-card shadow-lg rounded-lg py-2 border border-border animate-in fade-in z-50 max-h-48 overflow-y-auto">
+                          <button
+                            className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${!newTaskType ? 'bg-muted font-bold' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNewTaskType('');
+                              setTaskTypeDropdownOpen(false);
+                            }}
+                          >
+                            No type
+                          </button>
+                          {availableTaskTypes.map(type => (
+                            <button
+                              key={type}
+                              className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${newTaskType === type ? 'bg-muted font-bold' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNewTaskType(type);
+                                setTaskTypeDropdownOpen(false);
+                              }}
+                            >
+                              {type}
+                            </button>
+                          ))}
+                          <button
+                            className="w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-primary/10 text-primary flex items-center gap-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNewTaskType('__add_new__');
+                              setTaskTypeDropdownOpen(false);
+                            }}
+                          >
+                            <Plus className="w-4 h-4" /> Add New Type
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {newTaskType === '__add_new__' && (
+                      <div className="mt-3 p-3 bg-muted/20 rounded-lg border border-border">
+                        <input
+                          type="text"
+                          placeholder="Enter new task type name..."
+                          value={newTaskTypeName}
+                          onChange={(e) => setNewTaskTypeName(e.target.value)}
+                          className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleCreateTaskType();
+                            } else if (e.key === 'Escape') {
+                              setNewTaskType('');
+                              setNewTaskTypeName('');
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={handleCreateTaskType}
+                            disabled={!newTaskTypeName.trim()}
+                            className="px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Add Type
+                          </button>
+                          <button
+                            onClick={() => {
+                              setNewTaskType('');
+                              setNewTaskTypeName('');
+                            }}
+                            className="px-3 py-1 text-sm bg-muted text-foreground rounded-md hover:bg-muted/80 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="taskDeadline" className="block text-sm font-medium text-foreground mb-3">
+                      Deadline (optional)
+                    </label>
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <input
+                          id="taskDeadline"
+                          type="date"
+                          value={newTaskDeadline ? newTaskDeadline.split('T')[0] : ''}
+                          onChange={(e) => {
+                            const dateValue = e.target.value;
+                            if (dateValue) {
+                              // If there's already a time, preserve it
+                              const existingTime = newTaskDeadline ? newTaskDeadline.split('T')[1] : '';
+                              const newDateTime = existingTime ? `${dateValue}T${existingTime}` : `${dateValue}T00:00`;
+                              setNewTaskDeadline(newDateTime);
+                            } else {
+                              setNewTaskDeadline('');
+                            }
+                          }}
+                          className="w-full px-4 py-3 pr-12 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 text-base"
+                        />
+                        {newTaskDeadline && (
+                          <button
+                            type="button"
+                            onClick={() => setNewTaskDeadline('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
+                            title="Clear deadline"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      {newTaskDeadline && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="time"
+                            value={newTaskDeadline.split('T')[1] || '00:00'}
+                            onChange={(e) => {
+                              const timeValue = e.target.value;
+                              const dateValue = newTaskDeadline.split('T')[0];
+                              setNewTaskDeadline(`${dateValue}T${timeValue}`);
+                            }}
+                            className="px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 text-sm"
+                          />
+                          <span className="text-xs text-muted-foreground">Time (optional)</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-6">
+                  <div>
+                    <label htmlFor="taskTags" className="block text-sm font-medium text-foreground mb-3">
+                      Tags
+                    </label>
+                    <CreatableSelect
+                      isMulti
+                      inputId="taskTags"
+                      placeholder="Add a tag and press enter..."
+                      value={newTaskTags.map(tag => ({ label: tag, value: tag }))}
+                      onChange={selected => setNewTaskTags(selected ? selected.map(opt => opt.value) : [])}
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base, state) => ({
+                          ...base,
+                          backgroundColor: 'var(--background)',
+                          borderColor: 'var(--border)',
+                          color: 'var(--foreground)',
+                          boxShadow: state.isFocused ? '0 0 0 2px var(--primary)' : base.boxShadow,
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          backgroundColor: 'var(--card)',
+                          color: 'var(--foreground)',
+                          zIndex: 100,
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isFocused
+                            ? 'var(--primary)/10'
+                            : 'var(--card)',
+                          color: 'var(--foreground)',
+                          cursor: 'pointer',
+                        }),
+                        multiValue: (base) => {
+                          const isDark = document.documentElement.classList.contains('dark');
+                          return {
+                            ...base,
+                            backgroundColor: isDark ? '#334155' : '#e0e7ff', // slate-700 for dark, indigo-100 for light
+                            color: isDark ? '#f1f5f9' : '#1e293b', // slate-100 for dark, slate-800 for light
+                            borderRadius: '6px',
+                            padding: '0 2px',
+                          };
+                        },
+                        multiValueLabel: (base) => {
+                          const isDark = document.documentElement.classList.contains('dark');
+                          return {
+                            ...base,
+                            color: isDark ? '#f1f5f9' : '#1e293b',
+                            fontWeight: 500,
+                          };
+                        },
+                        multiValueRemove: (base) => {
+                          const isDark = document.documentElement.classList.contains('dark');
+                          return {
+                            ...base,
+                            color: isDark ? '#f1f5f9' : '#1e293b',
+                            ':hover': {
+                              backgroundColor: isDark ? '#475569' : '#c7d2fe',
+                              color: isDark ? '#fff' : '#1e293b',
+                            },
+                          };
+                        },
+                        input: (base) => ({ ...base, color: 'var(--foreground)' }),
+                        placeholder: (base) => ({ ...base, color: 'var(--muted-foreground)' }),
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-3">
+                      Add to Column
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setNewTaskStatus('NEW')}
+                        className={`p-4 rounded-lg border transition-all duration-200 text-left ${
+                          newTaskStatus === 'NEW'
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
+                        }`}
+                      >
+                        <div className="font-medium">Backlog</div>
+                        <div className="text-xs text-muted-foreground mt-1">New tasks</div>
+                      </button>
+                      
+                      <button
+                        onClick={() => setNewTaskStatus('UP_NEXT')}
+                        className={`p-4 rounded-lg border transition-all duration-200 text-left ${
+                          newTaskStatus === 'UP_NEXT'
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
+                        }`}
+                      >
+                        <div className="font-medium">Up Next</div>
+                        <div className="text-xs text-muted-foreground mt-1">Ready to start</div>
+                      </button>
+                      
+                      <button
+                        onClick={() => setNewTaskStatus('IN_PROGRESS')}
+                        className={`p-4 rounded-lg border transition-all duration-200 text-left ${
+                          newTaskStatus === 'IN_PROGRESS'
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
+                        }`}
+                      >
+                        <div className="font-medium">In Progress</div>
+                        <div className="text-xs text-muted-foreground mt-1">Currently working</div>
+                      </button>
+                      
+                      <button
+                        onClick={() => setNewTaskStatus('BLOCKED')}
+                        className={`p-4 rounded-lg border transition-all duration-200 text-left ${
+                          newTaskStatus === 'BLOCKED'
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
+                        }`}
+                      >
+                        <div className="font-medium">Blocked</div>
+                        <div className="text-xs text-muted-foreground mt-1">Waiting for something</div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Description - Full Width */}
               <div>
                 <label htmlFor="taskDescription" className="block text-sm font-medium text-foreground mb-3">
                   Description (optional)
@@ -1519,222 +2007,6 @@ export function KanbanBoard() {
                   placeholder="Add more details about this task..."
                   className="w-full px-4 py-3 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 text-base min-h-[80px]"
                 />
-              </div>
-              <div>
-                <label htmlFor="taskType" className="block text-sm font-medium text-foreground mb-3">
-                  Task Type (optional)
-                </label>
-                <div className="relative" data-task-type-dropdown>
-                  <button
-                    type="button"
-                    onClick={() => setTaskTypeDropdownOpen(v => !v)}
-                    className="w-full px-4 py-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 text-base text-left flex items-center justify-between"
-                  >
-                    <span className={newTaskType ? 'text-foreground' : 'text-muted-foreground'}>
-                      {newTaskType || 'Select a task type...'}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition ${taskTypeDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {taskTypeDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-card shadow-lg rounded-lg py-2 border border-border animate-in fade-in z-50 max-h-48 overflow-y-auto">
-                      <button
-                        className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${!newTaskType ? 'bg-muted font-bold' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setNewTaskType('');
-                          setTaskTypeDropdownOpen(false);
-                        }}
-                      >
-                        No type
-                      </button>
-                      {availableTaskTypes.map(type => (
-                        <button
-                          key={type}
-                          className={`w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-muted ${newTaskType === type ? 'bg-muted font-bold' : ''}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setNewTaskType(type);
-                            setTaskTypeDropdownOpen(false);
-                          }}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm font-medium rounded transition hover:bg-primary/10 text-primary flex items-center gap-2"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setNewTaskType('__add_new__');
-                          setTaskTypeDropdownOpen(false);
-                        }}
-                      >
-                        <Plus className="w-4 h-4" /> Add New Type
-                      </button>
-                    </div>
-                  )}
-                </div>
-                
-                {newTaskType === '__add_new__' && (
-                  <div className="mt-3 p-3 bg-muted/20 rounded-lg border border-border">
-                    <input
-                      type="text"
-                      placeholder="Enter new task type name..."
-                      value={newTaskTypeName}
-                      onChange={(e) => setNewTaskTypeName(e.target.value)}
-                      className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleCreateTaskType();
-                        } else if (e.key === 'Escape') {
-                          setNewTaskType('');
-                          setNewTaskTypeName('');
-                        }
-                      }}
-                      autoFocus
-                    />
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={handleCreateTaskType}
-                        disabled={!newTaskTypeName.trim()}
-                        className="px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Add Type
-                      </button>
-                      <button
-                        onClick={() => {
-                          setNewTaskType('');
-                          setNewTaskTypeName('');
-                        }}
-                        className="px-3 py-1 text-sm bg-muted text-foreground rounded-md hover:bg-muted/80 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label htmlFor="taskTags" className="block text-sm font-medium text-foreground mb-3">
-                  Tags
-                </label>
-                <CreatableSelect
-                  isMulti
-                  inputId="taskTags"
-                  placeholder="Add a tag and press enter..."
-                  value={newTaskTags.map(tag => ({ label: tag, value: tag }))}
-                  onChange={selected => setNewTaskTags(selected ? selected.map(opt => opt.value) : [])}
-                  classNamePrefix="react-select"
-                  styles={{
-                    control: (base, state) => ({
-                      ...base,
-                      backgroundColor: 'var(--background)',
-                      borderColor: 'var(--border)',
-                      color: 'var(--foreground)',
-                      boxShadow: state.isFocused ? '0 0 0 2px var(--primary)' : base.boxShadow,
-                    }),
-                    menu: (base) => ({
-                      ...base,
-                      backgroundColor: 'var(--card)',
-                      color: 'var(--foreground)',
-                      zIndex: 100,
-                    }),
-                    option: (base, state) => ({
-                      ...base,
-                      backgroundColor: state.isFocused
-                        ? 'var(--primary)/10'
-                        : 'var(--card)',
-                      color: 'var(--foreground)',
-                      cursor: 'pointer',
-                    }),
-                    multiValue: (base) => {
-                      const isDark = document.documentElement.classList.contains('dark');
-                      return {
-                        ...base,
-                        backgroundColor: isDark ? '#334155' : '#e0e7ff', // slate-700 for dark, indigo-100 for light
-                        color: isDark ? '#f1f5f9' : '#1e293b', // slate-100 for dark, slate-800 for light
-                        borderRadius: '6px',
-                        padding: '0 2px',
-                      };
-                    },
-                    multiValueLabel: (base) => {
-                      const isDark = document.documentElement.classList.contains('dark');
-                      return {
-                        ...base,
-                        color: isDark ? '#f1f5f9' : '#1e293b',
-                        fontWeight: 500,
-                      };
-                    },
-                    multiValueRemove: (base) => {
-                      const isDark = document.documentElement.classList.contains('dark');
-                      return {
-                        ...base,
-                        color: isDark ? '#f1f5f9' : '#1e293b',
-                        ':hover': {
-                          backgroundColor: isDark ? '#475569' : '#c7d2fe',
-                          color: isDark ? '#fff' : '#1e293b',
-                        },
-                      };
-                    },
-                    input: (base) => ({ ...base, color: 'var(--foreground)' }),
-                    placeholder: (base) => ({ ...base, color: 'var(--muted-foreground)' }),
-                  }}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-3">
-                  Add to Column
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setNewTaskStatus('NEW')}
-                    className={`p-4 rounded-lg border transition-all duration-200 text-left ${
-                      newTaskStatus === 'NEW'
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
-                    }`}
-                  >
-                    <div className="font-medium">Backlog</div>
-                    <div className="text-xs text-muted-foreground mt-1">New tasks</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => setNewTaskStatus('UP_NEXT')}
-                    className={`p-4 rounded-lg border transition-all duration-200 text-left ${
-                      newTaskStatus === 'UP_NEXT'
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
-                    }`}
-                  >
-                    <div className="font-medium">Up Next</div>
-                    <div className="text-xs text-muted-foreground mt-1">Ready to start</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => setNewTaskStatus('IN_PROGRESS')}
-                    className={`p-4 rounded-lg border transition-all duration-200 text-left ${
-                      newTaskStatus === 'IN_PROGRESS'
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
-                    }`}
-                  >
-                    <div className="font-medium">In Progress</div>
-                    <div className="text-xs text-muted-foreground mt-1">Currently working</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => setNewTaskStatus('BLOCKED')}
-                    className={`p-4 rounded-lg border transition-all duration-200 text-left ${
-                      newTaskStatus === 'BLOCKED'
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
-                    }`}
-                  >
-                    <div className="font-medium">Blocked</div>
-                    <div className="text-xs text-muted-foreground mt-1">Waiting for something</div>
-                  </button>
-                </div>
               </div>
               
               <div className="flex justify-end gap-3 pt-4">

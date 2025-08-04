@@ -81,6 +81,42 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer, onSh
   // Show worked time badge only if actively working
   const showWorkedTime = task.status === 'WORKING';
 
+  // Format deadline for display
+  const formatDeadline = (deadline: string) => {
+    const d = new Date(deadline);
+    const now = new Date();
+    
+    // Compare dates only (ignoring time) for day-level comparison
+    const deadlineDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.floor((deadlineDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Check if time is set (not midnight)
+    const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+    
+    // For time-sensitive deadlines, check if the specific time has passed
+    const isTimePassed = hasTime && d.getTime() < now.getTime();
+    
+    if (diffDays < 0) {
+      // Past date - overdue
+      return { text: `Overdue`, color: 'text-red-500 dark:text-red-400', hasTime };
+    } else if (diffDays === 0) {
+      // Same date
+      if (isTimePassed) {
+        return { text: `Overdue`, color: 'text-red-500 dark:text-red-400', hasTime };
+      } else {
+        return { text: hasTime ? `Today` : `Today (EOD)`, color: 'text-orange-500 dark:text-orange-400', hasTime };
+      }
+    } else if (diffDays === 1) {
+      return { text: hasTime ? `Tomorrow` : `Tomorrow (EOD)`, color: 'text-yellow-500 dark:text-yellow-400', hasTime };
+    } else if (diffDays <= 7) {
+      return { text: hasTime ? `${diffDays}d` : `${diffDays}d (EOD)`, color: 'text-blue-500 dark:text-blue-400', hasTime };
+    } else {
+      const dateText = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      return { text: hasTime ? dateText : `${dateText} (EOD)`, color: 'text-muted-foreground', hasTime };
+    }
+  };
+
   // Prevent click on hover menu from triggering card click
   const stopPropagation = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -128,6 +164,15 @@ export function KanbanCard({ task, onDelete, onEdit, onMove, onToggleTimer, onSh
           <div className="mb-2">
             <span className="inline-block px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium rounded border border-blue-200 dark:border-blue-800">
               {task.taskType}
+            </span>
+          </div>
+        )}
+        {/* Deadline */}
+        {task.deadline && (
+          <div className="mb-2">
+            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border ${formatDeadline(task.deadline).color.includes('red') ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : formatDeadline(task.deadline).color.includes('orange') ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' : formatDeadline(task.deadline).color.includes('yellow') ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800' : formatDeadline(task.deadline).color.includes('blue') ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-muted-foreground/10 border-border'}`}>
+              <span className="text-red-500">⏰</span>
+              {formatDeadline(task.deadline).text}
             </span>
           </div>
         )}

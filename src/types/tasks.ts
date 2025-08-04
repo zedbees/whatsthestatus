@@ -19,5 +19,6 @@ export interface Task {
   startedAt?: string; // for current session timer
   totalWorkingTime?: number; // total accumulated working time in milliseconds
   priority?: number;
+  deadline?: string; // ISO date string for deadline
   history: TaskHistoryEntry[];
 } 
