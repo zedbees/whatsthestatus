@@ -1019,29 +1019,27 @@ export function KanbanBoard() {
       });
     }
 
-    // Periodic activity check (every 30 seconds)
+    // Periodic activity check (every 2 minutes - less aggressive)
     const activityInterval = setInterval(() => {
       const lastActive = localStorage.getItem('kanban-last-active');
       if (lastActive) {
         const gap = Date.now() - parseInt(lastActive);
-        const threshold = settings?.autoPauseAfterMinutes ? settings.autoPauseAfterMinutes * 60 * 1000 : 30 * 60 * 1000;
         
-        if (gap > threshold) {
+        // Only auto-pause for significant inactivity (5+ minutes)
+        if (gap > 300000) {
           const activeTask = tasks.find(t => t.status === 'WORKING');
           if (activeTask) {
             console.log(`Auto-pausing task due to ${Math.round(gap / 60000)} minutes of inactivity`);
             toggleTimer(activeTask.id);
             
             // Show notification
-            if (gap > 300000) { // Only show for 5+ minutes
-              setTimeout(() => {
-                alert(`Task "${activeTask.title}" was auto-paused due to ${Math.round(gap / 60000)} minutes of inactivity.\n\nThis usually happens when:\n• Your MacBook went to sleep\n• You were away from the computer\n• The browser tab was inactive`);
-              }, 1000);
-            }
+            setTimeout(() => {
+              alert(`Task "${activeTask.title}" was auto-paused due to ${Math.round(gap / 60000)} minutes of inactivity.\n\nThis usually happens when:\n• Your MacBook went to sleep\n• You were away from the computer\n• The browser tab was inactive`);
+            }, 1000);
           }
         }
       }
-    }, 30000);
+    }, 120000); // Check every 2 minutes instead of 30 seconds
 
     // Initial update
     enhancedUpdateLastActive();
@@ -1548,51 +1546,36 @@ export function KanbanBoard() {
     }
   }, [tasks, settings]);
 
-  // Check for inactivity on mount and when page becomes visible
+  // Check for inactivity only when page becomes visible after being hidden for a while
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let lastHiddenTime: number | null = null;
     
-    const handleInactivityCheck = () => {
-      // Clear any existing timeout to prevent multiple checks
-      if (timeoutId) clearTimeout(timeoutId);
-      
-      // Add a small delay to ensure state is loaded and prevent race conditions
-      timeoutId = setTimeout(() => {
-        checkAndHandleInactivity();
-      }, 500);
-    };
-
-    // Check on mount
-    handleInactivityCheck();
-
-    // Check when page becomes visible (e.g., after sleep)
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        handleInactivityCheck();
+      if (document.hidden) {
+        // Page is being hidden - record the time
+        lastHiddenTime = Date.now();
+      } else if (lastHiddenTime) {
+        // Page is becoming visible again - check if it was hidden for a significant time
+        const hiddenDuration = Date.now() - lastHiddenTime;
+        const threshold = settings?.autoPauseAfterMinutes ? settings.autoPauseAfterMinutes * 60 * 1000 : 30 * 60 * 1000;
+        
+        if (hiddenDuration > threshold) {
+          // Only check for inactivity if the page was hidden for a significant time
+          setTimeout(() => {
+            checkAndHandleInactivity();
+          }, 1000);
+        }
+        
+        lastHiddenTime = null;
       }
     };
 
-    // Check when window gains focus (e.g., switching back to tab)
-    const handleFocus = () => {
-      handleInactivityCheck();
-    };
-
-    // Check when user returns from lock screen or other system events
-    const handleResume = () => {
-      handleInactivityCheck();
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('resume', handleResume);
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('resume', handleResume);
     };
-  }, [checkAndHandleInactivity]);
+  }, [checkAndHandleInactivity, settings]);
 
   // Enhanced before unload handling - save current state when leaving
   useEffect(() => {
@@ -1626,9 +1609,11 @@ export function KanbanBoard() {
             const autoPauseThreshold = settings?.autoPauseAfterMinutes ? settings.autoPauseAfterMinutes * 60 * 1000 : 120000;
             
             if (gap > autoPauseThreshold) {
-              // Auto-pause due to inactivity
-              console.log(`Auto-pausing task due to ${Math.round(gap / 60000)} minute gap (threshold: ${settings?.autoPauseAfterMinutes || 2} minutes)`);
-              checkAndHandleInactivity();
+              // Auto-pause due to inactivity - only for significant gaps (5+ minutes)
+              if (gap > 300000) {
+                console.log(`Auto-pausing task due to ${Math.round(gap / 60000)} minute gap (threshold: ${settings?.autoPauseAfterMinutes || 2} minutes)`);
+                checkAndHandleInactivity();
+              }
             } else {
               // Task was paused due to page unload, show resume prompt
               setTimeout(() => {
