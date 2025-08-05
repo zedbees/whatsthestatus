@@ -945,7 +945,8 @@ export function KanbanBoard() {
   // Track user activity more comprehensively
   useEffect(() => {
     const updateLastActive = () => {
-      localStorage.setItem('kanban-last-active', Date.now().toString());
+      const now = Date.now();
+      localStorage.setItem('kanban-last-active', now.toString());
     };
 
     // Update on various user activities
@@ -979,6 +980,16 @@ export function KanbanBoard() {
         console.log('Detected Cmd+Ctrl+Q - updating last active time');
         enhancedUpdateLastActive();
       }
+      
+      // Quick pause shortcut (Cmd/Ctrl + Shift + P)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
+        e.preventDefault();
+        const activeTask = tasks.find(t => t.status === 'WORKING');
+        if (activeTask) {
+          toggleTimer(activeTask.id);
+          alert('Task paused via keyboard shortcut!');
+        }
+      }
     };
 
     // Enhanced system-level detection
@@ -1008,6 +1019,30 @@ export function KanbanBoard() {
       });
     }
 
+    // Periodic activity check (every 30 seconds)
+    const activityInterval = setInterval(() => {
+      const lastActive = localStorage.getItem('kanban-last-active');
+      if (lastActive) {
+        const gap = Date.now() - parseInt(lastActive);
+        const threshold = settings?.autoPauseAfterMinutes ? settings.autoPauseAfterMinutes * 60 * 1000 : 30 * 60 * 1000;
+        
+        if (gap > threshold) {
+          const activeTask = tasks.find(t => t.status === 'WORKING');
+          if (activeTask) {
+            console.log(`Auto-pausing task due to ${Math.round(gap / 60000)} minutes of inactivity`);
+            toggleTimer(activeTask.id);
+            
+            // Show notification
+            if (gap > 300000) { // Only show for 5+ minutes
+              setTimeout(() => {
+                alert(`Task "${activeTask.title}" was auto-paused due to ${Math.round(gap / 60000)} minutes of inactivity.\n\nThis usually happens when:\n• Your MacBook went to sleep\n• You were away from the computer\n• The browser tab was inactive`);
+              }, 1000);
+            }
+          }
+        }
+      }
+    }, 30000);
+
     // Initial update
     enhancedUpdateLastActive();
 
@@ -1023,8 +1058,9 @@ export function KanbanBoard() {
       window.removeEventListener('offline', handleSystemEvents);
       window.removeEventListener('resize', handleSystemEvents);
       window.removeEventListener('orientationchange', handleSystemEvents);
+      clearInterval(activityInterval);
     };
-  }, []);
+  }, [tasks, settings]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -1091,9 +1127,73 @@ export function KanbanBoard() {
     localStorage.setItem('kanban-current-workspace', currentWorkspace);
   }, [currentWorkspace]);
 
+  // Listen for task updates from other tabs
+  useEffect(() => {
+    if (!window.BroadcastChannel) return;
+    
+    const channel = new BroadcastChannel('kanban-tasks');
+    
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'TASKS_UPDATED') {
+        const incomingTasks = event.data.tasks;
+        const currentTimestamp = event.data.timestamp;
+        
+        // Only update if the incoming data is newer
+        const lastUpdate = localStorage.getItem('kanban-last-update');
+        if (!lastUpdate || currentTimestamp > parseInt(lastUpdate)) {
+          setTasks(incomingTasks);
+          localStorage.setItem('kanban-last-update', currentTimestamp.toString());
+          
+          // Check if there's a conflict with active tasks
+          const currentActiveTask = tasks.find((t: Task) => t.status === 'WORKING');
+          const incomingActiveTask = incomingTasks.find((t: Task) => t.status === 'WORKING');
+          
+          if (currentActiveTask && incomingActiveTask && currentActiveTask.id !== incomingActiveTask.id) {
+            // Conflict detected - ask user what to do
+            setTimeout(() => {
+              const choice = confirm(
+                `Task conflict detected!\n\n` +
+                `Current tab: "${currentActiveTask.title}" (${formatDuration(currentActiveTask.totalWorkingTime || 0)})\n` +
+                `Other tab: "${incomingActiveTask.title}" (${formatDuration(incomingActiveTask.totalWorkingTime || 0)})\n\n` +
+                `Only one task can be active at a time. Would you like to keep the task from the other tab?`
+              );
+              
+              if (choice) {
+                                 // Keep the incoming task, pause the current one
+                 setTasks((currentTasks: Task[]) => currentTasks.map((t: Task) => {
+                   if (t.id === currentActiveTask.id) {
+                     return { ...t, status: 'IN_PROGRESS', startedAt: undefined };
+                   }
+                   return t;
+                 }));
+              }
+            }, 1000);
+          }
+        }
+      }
+    };
+    
+    channel.addEventListener('message', handleMessage);
+    
+    return () => {
+      channel.removeEventListener('message', handleMessage);
+      channel.close();
+    };
+  }, [tasks]);
+
   // Save tasks to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('kanban-tasks', JSON.stringify(tasks));
+    
+    // Broadcast task changes to other tabs
+    if (window.BroadcastChannel) {
+      const channel = new BroadcastChannel('kanban-tasks');
+      channel.postMessage({
+        type: 'TASKS_UPDATED',
+        tasks: tasks,
+        timestamp: Date.now()
+      });
+    }
   }, [tasks]);
 
   const addNewBoard = () => {
@@ -1241,10 +1341,10 @@ export function KanbanBoard() {
   // Only one task can be WORKING at a time
   const toggleTimer = (id: string) => {
     setTasks(tasks => {
-      const currentActive = tasks.find(t => t.status === 'WORKING');
+      const currentActive = tasks.find((t: Task) => t.status === 'WORKING');
       const now = new Date().toISOString();
       
-      return tasks.map(t => {
+      return tasks.map((t: Task) => {
         if (t.id === id) {
           if (t.status !== 'WORKING') {
             // Start working on this task
@@ -1611,7 +1711,7 @@ export function KanbanBoard() {
         <div className="fixed top-8 right-8 z-50 flex gap-4">
           <FloatingAnalyticsButton onClick={() => setAnalyticsOpen(true)} />
           <FloatingSettingsButton onClick={() => setSettingsOpen(true)} />
-      <ThemeToggleFloatingButton />
+          <ThemeToggleFloatingButton />
         </div>
       )}
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
@@ -2160,6 +2260,27 @@ export function KanbanBoard() {
               >
                 Mark Done
               </button>
+            </div>
+            {/* Activity status */}
+            <div className="text-xs text-muted-foreground mt-2">
+              Last active: {(() => {
+                const lastActive = localStorage.getItem('kanban-last-active');
+                if (lastActive) {
+                  const gap = Date.now() - parseInt(lastActive);
+                  if (gap < 60000) return 'Just now';
+                  if (gap < 3600000) return `${Math.floor(gap / 60000)}m ago`;
+                  return `${Math.floor(gap / 3600000)}h ago`;
+                }
+                return 'Unknown';
+              })()}
+            </div>
+            {/* Multi-tab warning */}
+            <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+              💡 Tip: Only one task can be active across all tabs. Changes sync automatically.
+            </div>
+            {/* Keyboard shortcuts */}
+            <div className="text-xs text-muted-foreground">
+              Quick pause: {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Shift+P
             </div>
           </div>
         ) : currentWorkspaceTasks.length === 0 ? (
